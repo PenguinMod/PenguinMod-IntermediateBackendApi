@@ -71,19 +71,19 @@ app.use(bodyParser.urlencoded({
 app.use(bodyParser.json({ limit: process.env.ServerSize }));
 
 app.get('/', async function (req, res) {
-    res.redirect('https://docs.penguinmod.site/project-api')
+    res.redirect('https://docs.penguinmod.site/project-api');
 });
 
 // nothing lol
 app.get('/api', async function (req, res) {
-    res.status(200)
+    res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({
         "unavailable": {
             "main": false
         },
         "testing": {
-            "main": false
+            "main": true
         },
         // todo: move to JSON file? preferabbly metadata.json if its not used
         "version": {
