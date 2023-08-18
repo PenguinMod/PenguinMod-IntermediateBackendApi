@@ -531,19 +531,21 @@ app.get('/api/projects/approve', async function (req, res) {
         isUpdatingProjectData = true;
     }
     if (shouldCreateBackup) {
-        const backupFolder = `./projects/backup/Backup${idToSetTo}`;
-        try {
-            fs.mkdirSync(backupFolder);
-        } catch { };
-        const dbEntry = db.get(String(idToSetTo));
-        fs.writeFile(`${backupFolder}/entry.json`, JSON.stringify(dbEntry), err => { if (err) console.log("failed to create backup of db entry;", err) });
-        const fileData = fs.readFileSync(`./projects/uploaded/p${idToSetTo}.txt`, "utf-8");
-        fs.writeFile(`${backupFolder}/data.txt`, fileData, err => { if (err) console.log("failed to create backup of project data;", err) });
+        // ignore currenlty, we cant do this properly atm and we dont need to
+        // const backupFolder = `./projects/backup/Backup${idToSetTo}`;
+        // try {
+        //     fs.mkdirSync(backupFolder);
+        // } catch { };
+        // const dbEntry = db.get(String(idToSetTo));
+        // fs.writeFile(`${backupFolder}/entry.json`, JSON.stringify(dbEntry), err => { if (err) console.log("failed to create backup of db entry;", err) });
+        // const fileData = fs.readFileSync(`./projects/uploaded/p${idToSetTo}.txt`, "utf-8");
+        // fs.writeFile(`${backupFolder}/data.txt`, fileData, err => { if (err) console.log("failed to create backup of project data;", err) });
     }
     db.set(String(idToSetTo), project);
     if (isUpdatingProjectData) {
-        const fileData = fs.readFileSync(`./projects/uploaded/p${replacedWithId}.txt`, "utf-8");
-        fs.writeFile(`./projects/uploaded/p${idToSetTo}.txt`, fileData, err => { if (err) console.log("failed to update project data;", err) });
+        // uhh what the hell is this supposed to do?
+        // const fileData = fs.readFileSync(`./projects/uploaded/p${replacedWithId}.txt`, "utf-8");
+        // fs.writeFile(`./projects/uploaded/p${idToSetTo}.txt`, fileData, err => { if (err) console.log("failed to update project data;", err) });
     }
     res.status(200);
     res.header("Content-Type", 'application/json');
@@ -1051,12 +1053,12 @@ app.get('/api/projects/getPublished', async function (req, res) {
     db = new Database(`${__dirname}` + "/projects/published" + ".json");
     if (db.has(String(req.query.id))) {
         const project = db.get(String(req.query.id));
-        if (String(req.query.type) == "uri") {
-            res.status(200);
-            res.header("Content-Type", 'text/plain');
-            res.sendFile(`./projects/uploaded/p${project.id}.txt`);
-            return;
-        }
+        // if (String(req.query.type) == "uri") {
+        //     res.status(200);
+        //     res.header("Content-Type", 'text/plain');
+        //     res.sendFile(`./projects/uploaded/p${project.id}.pmp`);
+        //     return;
+        // }
         if (String(req.query.type) == "file") {
             fs.readFile(`./projects/uploaded/p${project.id}.pmp`, (err, data) => {
                 if (err) {
