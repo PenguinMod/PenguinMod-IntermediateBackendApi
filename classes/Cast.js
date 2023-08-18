@@ -57,6 +57,21 @@ class Cast {
     }
 
     /**
+     * Converts Data URLs to Buffers.
+     * @todo Move this to another class
+     * @param {string} dataUrl Value to cast to string.
+     * @return {Buffer} The new buffer.
+     */
+    static dataURLToBuffer(dataUrl) {
+        const stringed = Cast.toString(dataUrl);
+        if (!stringed.startsWith('data:')) return null;
+        if (!stringed.includes(';base64,')) return null;
+        const split = stringed.split(",");
+        const buffer = Buffer.from(split[1], 'base64');
+        return buffer;
+    }
+
+    /**
      * Determine if the argument is a white space string (or null / empty).
      * @param {*} val value to check.
      * @return {boolean} True if the argument is all white spaces or null / empty.
@@ -97,6 +112,14 @@ class Cast {
     static isArrayBuffer(val) {
         if (!val) return false;
         return typeof val.transfer === 'function';
+    }
+
+    /**
+     * Checks if the value is a string.
+     * @returns {boolean}
+     */
+    static isString(val) {
+        return typeof val === 'string';
     }
 }
 

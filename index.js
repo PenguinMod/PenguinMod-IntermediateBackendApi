@@ -114,10 +114,10 @@ app.get('/api/projects/getAll', async function (req, res) {
 });
 // get approved projects
 app.get('/api/projects/getApproved', async function (req, res) {
-    const db = new Database(`${__dirname}/projects/published.json`)
+    const db = new Database(`${__dirname}/projects/published.json`);
     // this is explained in paged api but basically just add normal projects to featured projects
     // because otherwise featured projects would come after normal projects
-    const featuredProjects = []
+    const featuredProjects = [];
     const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
         return sproject.date - project.date
     }).filter(proj => proj.accepted == true).filter(project => {
@@ -125,7 +125,7 @@ app.get('/api/projects/getApproved', async function (req, res) {
             featuredProjects.push(project)
         }
         return project.featured != true
-    })
+    });
     const returnArray = featuredProjects.concat(projects);
     // make project list
     // new ProjectList() with .toJSON will automatically cut the pages for us
@@ -134,7 +134,7 @@ app.get('/api/projects/getApproved', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.status(200);
     res.json(returning);
-})
+});
 // get approved projects but only a certain amount
 app.get('/api/projects/max', async function (req, res) {
     function grabArray() {
@@ -859,8 +859,8 @@ app.post('/api/projects/update', async function (req, res) {
 
     // todo: validate project data?
     const projectBufferData = packet.project;
-    if (Cast.isArrayBuffer(projectBufferData)) {
-        const buffer = Buffer.from(projectBufferData);
+    if (Cast.isString(projectBufferData)) {
+        const buffer = Cast.dataURLToBuffer(projectBufferData);
         fs.writeFile(`./projects/uploaded/p${id}.pmp`, buffer, (err) => {
             if (err) console.error(err);
         });
@@ -870,8 +870,8 @@ app.post('/api/projects/update', async function (req, res) {
         project.date = Date.now();
     }
     const projectbufferImage = packet.image;
-    if (Cast.isArrayBuffer(projectbufferImage)) {
-        const buffer = Buffer.from(projectbufferImage);
+    if (Cast.isString(projectbufferImage)) {
+        const buffer = Cast.dataURLToBuffer(projectbufferImage);
         fs.writeFile(`./projects/uploadedImages/p${id}.png`, buffer, (err) => {
             if (err) console.error(err);
         });
@@ -952,8 +952,8 @@ app.post('/api/projects/publish', async function (req, res) {
         return;
     }
     if (
-        Cast.isArrayBuffer(packet.image) ||
-        Cast.isArrayBuffer(packet.project)
+        Cast.isString(packet.image) ||
+        Cast.isString(packet.project)
     ) {
         res.status(400);
         res.header("Content-Type", 'application/json');
@@ -1020,11 +1020,11 @@ app.post('/api/projects/publish', async function (req, res) {
     }
     const id = _id;
 
-    const project = Buffer.from(packet.project);
+    const project = Cast.dataURLToBuffer(packet.project);
     fs.writeFile(`./projects/uploaded/p${id}.pmp`, project, (err) => {
         if (err) console.error(err);
     })
-    const image = Buffer.from(packet.image);
+    const image = Cast.dataURLToBuffer(packet.image);
     fs.writeFile(`./projects/uploadedImages/p${id}.png`, image, (err) => {
         if (err) console.error(err);
     });
@@ -1129,7 +1129,7 @@ app.get('/api/projects/getPublished', async function (req, res) {
 // })
 // sorts the projects into a nice array of pages
 app.get('/api/projects/paged', async function (req, res) {
-    Deprecation(res, "Not useful if pagination requires multiple requests");
+    Deprecation(res, "Not useful if pagination requires multiple requests, use /search for filtering and /getApproved for normal list");
     // db = new Database(`${__dirname}` + "/projects/published.json");
     // res.header("Content-Type", 'application/json');
     // res.status(200)
@@ -1184,6 +1184,45 @@ app.get('/api/projects/paged', async function (req, res) {
     // }
 
     // res.json(pagesArray)
+});
+// sorts the projects into a nice array of pages
+app.get('/api/projects/search', async function (req, res) {
+    const db = new Database(`${__dirname}/projects/published.json`);
+
+    const projectOwnerRequired = req.query.user;
+    const projectSearchingName = req.query.includes;
+
+    // add featured projects first but also sort them by date
+    // to do that we just sort all projects then add them to a seperate array
+    const featuredProjects = [];
+    const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
+        return sproject.date - project.date;
+    }).filter(proj => proj.accepted == true).filter(project => {
+        if (projectSearchingName) {
+            const projectName = Cast.toString(project.name).toLowerCase();
+            const ownerName = Cast.toString(projectSearchingName).toLowerCase();
+            return projectName.includes(ownerName);
+        }
+        if (typeof projectOwnerRequired !== "string") {
+            return true;
+        }
+        return project.owner === projectOwnerRequired;
+    }).filter(project => {
+        if (project.featured) {
+            featuredProjects.push(project);
+        }
+        return project.featured != true;
+    });
+    // we set the array to featuredProjectsArray.concat(array) instead of array.concat(featuredProjectsArray)
+    // because otherwise the featured projects would be after the normal projects
+    const returnArray = featuredProjects.concat(projects);
+    // make project list
+    // new ProjectList() with .toJSON will automatically cut the pages for us
+    const projectsList = new ProjectList(returnArray);
+    const returning = projectsList.toJSON(true, Cast.toNumber(req.query.page));
+    res.header("Content-Type", 'application/json');
+    res.status(200);
+    res.json(returning);
 });
 
 app.listen(port, () => console.log('Started server on port ' + port));
