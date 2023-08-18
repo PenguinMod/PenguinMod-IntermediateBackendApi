@@ -27,8 +27,8 @@ const port = 8080;
 const { encrypt, decrypt } = require("./utilities/encrypt.js");
 
 const UserManager = require("./classes/UserManager.js");
-const UserStorage = require("./classes/UserStorage.js");
-const StorageSpace = new UserStorage(32000000, 3); // 32 mb per data piece, 3 keys per container
+// const UserStorage = require("./classes/UserStorage.js");
+// const StorageSpace = new UserStorage(32000000, 3); // 32 mb per data piece, 3 keys per container
 UserManager.load(); // should prevent logouts
 
 const ProjectList = require("./classes/ProjectList.js");
