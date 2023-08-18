@@ -952,8 +952,8 @@ app.post('/api/projects/publish', async function (req, res) {
         return;
     }
     if (
-        Cast.isString(packet.image) ||
-        Cast.isString(packet.project)
+        !Cast.isString(packet.image) ||
+        !Cast.isString(packet.project)
     ) {
         res.status(400);
         res.header("Content-Type", 'application/json');
