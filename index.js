@@ -1,3 +1,4 @@
+// todo: move to external file?
 const ApproverUsernames = [
     "JeremyGamer13",
     "JGamerTesting",
@@ -887,9 +888,10 @@ app.post('/api/projects/update', async function (req, res) {
     res.json({ "success": true });
 })
 // upload project to the main page
+// todo: shouldnt this be an env variable?
 const UploadsDisabled = false;
 app.post('/api/projects/publish', async function (req, res) {
-    if (UploadsDisabled) {
+    if (UploadsDisabled && (!ApproverUsernames.includes(packet.author))) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "PublishDisabled" });
