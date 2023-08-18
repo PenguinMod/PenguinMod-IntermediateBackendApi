@@ -301,8 +301,8 @@ app.get('/api/pmWrapper/scratchUserImage', async function (req, res) {
     ScratchRequestQueue += 400;
     setTimeout(() => {
         ScratchRequestQueue -= 400;
-        fetch(`https://trampoline.turbowarp.org/avatars/by-username/${usableName}`).then(res => {
-            res.arrayBuffer().then(arrayBuffer => {
+        fetch(`https://trampoline.turbowarp.org/avatars/by-username/${usableName}`).then(serverResponse => {
+            serverResponse.arrayBuffer().then(arrayBuffer => {
                 const buffer = Buffer.from(arrayBuffer);
                 CachedScratchUsers[usableName] = buffer;
                 res.status(200);
