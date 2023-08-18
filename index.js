@@ -938,15 +938,28 @@ app.post('/api/projects/publish', async function (req, res) {
 
     if (
         (typeof packet.title !== "string") ||
-        (typeof packet.author !== "string") ||
-        (typeof packet.image !== "string") ||
-        (typeof packet.project !== "string")
+        (typeof packet.author !== "string")
     ) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FormatError" });
         if (DEBUG_logAllFailedData) {
             console.log("FormatError", packet);
+            fs.writeFile("./temp.log", JSON.stringify(packet), err => {
+                if (err) console.log(err);
+            });
+        };
+        return;
+    }
+    if (
+        Cast.isArrayBuffer(packet.image) ||
+        Cast.isArrayBuffer(packet.project)
+    ) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FormatError2" });
+        if (DEBUG_logAllFailedData) {
+            console.log("FormatError2", packet);
             fs.writeFile("./temp.log", JSON.stringify(packet), err => {
                 if (err) console.log(err);
             });
