@@ -891,13 +891,13 @@ app.post('/api/projects/update', async function (req, res) {
 // todo: shouldnt this be an env variable?
 const UploadsDisabled = false;
 app.post('/api/projects/publish', async function (req, res) {
+    const packet = req.body;
     if (UploadsDisabled && (!ApproverUsernames.includes(packet.author))) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "PublishDisabled" });
         return;
     }
-    const packet = req.body;
     if (UserManager.isBanned(packet.author)) {
         res.status(403);
         res.header("Content-Type", 'application/json');
