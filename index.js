@@ -485,7 +485,7 @@ app.get('/api/projects/approve', async function (req, res) {
     }
     project.updating = false;
     project.accepted = true;
-    if (project.remix != null) isRemix = true;
+    if (Cast.toBoolean(project.remix)) isRemix = true;
     if (packet.newMeta != null) {
         const newMetadata = SafeJSONParse(packet.newMeta);
         // in this case we'll trust the approver to have put strings as the values
@@ -551,7 +551,7 @@ app.get('/api/projects/approve', async function (req, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
-    if (String(req.query.webhook) === "false") return;
+    if (Cast.toBoolean(req.query.webhook) === false) return;
     const projectImage = String(`https://projects.penguinmod.site/api/pmWrapper/iconUrl?id=${project.id}&rn=${Math.round(Math.random() * 9999999)}`);
     const body = JSON.stringify({
         content: `A project was ${isUpdated ? "updated" : (isRemix ? "remixed" : "approved")}!`,
@@ -617,7 +617,7 @@ app.get('/api/projects/feature', async function (req, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
-    if (String(req.query.webhook) === "false") return;
+    if (Cast.toBoolean(req.query.webhook) === false) return;
     const projectImage = String(`https://projects.penguinmod.site/api/pmWrapper/iconUrl?id=${project.id}&rn=${Math.round(Math.random() * 9999999)}`);
     const projectTitle = String(project.name).substring(0, 250);
     const body = JSON.stringify({
