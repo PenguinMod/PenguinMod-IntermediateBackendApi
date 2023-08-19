@@ -1193,6 +1193,7 @@ app.get('/api/projects/search', async function (req, res) {
 
     const projectOwnerRequired = req.query.user;
     const projectSearchingName = req.query.includes;
+    const mustBeFeatured = req.query.featured;
 
     // add featured projects first but also sort them by date
     // to do that we just sort all projects then add them to a seperate array
@@ -1210,8 +1211,16 @@ app.get('/api/projects/search', async function (req, res) {
         }
         return project.owner === projectOwnerRequired;
     }).filter(project => {
+        if (Cast.toString(mustBeFeatured) === 'exclude') {
+            // returning here removes featured projects
+            return project.featured != true;
+        }
         if (project.featured) {
             featuredProjects.push(project);
+        }
+        if (Cast.toString(mustBeFeatured) === 'true') {
+            // returning false here removes normal projects
+            return false;
         }
         return project.featured != true;
     });
