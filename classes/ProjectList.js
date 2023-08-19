@@ -16,7 +16,15 @@ class ProjectList {
      */
     toJSON(applyPagination, page, pageLength) {
         const json = {
-            projects: this.projects,
+            projects: this.projects.map(project => {
+                // clone & remove stuff that may increase network usage
+                const clone = JSON.parse(JSON.stringify(project));
+                delete clone.instructions;
+                delete clone.notes;
+                delete clone.loves;
+                delete clone.votes;
+                return clone;
+            }),
             paginated: this.paginated,
             attributes: this.extraDetails,
         };
