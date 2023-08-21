@@ -1081,8 +1081,11 @@ app.get('/api/projects/getPublished', async function (req, res) {
             });
             return;
         }
+        const clone = structuredClone(project);
+        clone.loves = Array.isArray(project.loves) ? project.loves.length : 0;
+        clone.votes = Array.isArray(project.votes) ? project.votes.length : 0;
         res.status(200);
-        res.json(project);
+        res.json(clone);
     } else {
         res.status(404);
         res.json({ "error": "NotFound" });
