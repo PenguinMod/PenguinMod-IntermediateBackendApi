@@ -53,7 +53,7 @@ function SafeJSONParse(json) {
 }
 
 function Deprecation(res, reason = "") {
-    res.status(400)
+    res.status(400);
     res.header("Content-Type", 'application/json');
     res.json({
         error: "Deprecated Endpoint",
@@ -72,29 +72,17 @@ app.use(bodyParser.urlencoded({
 app.use(bodyParser.json({ limit: process.env.ServerSize }));
 
 app.get('/', async function (req, res) {
-    res.redirect('https://docs.penguinmod.site/project-api');
+    res.redirect('https://projects.penguinmod.site/api');
+});
+app.get('/robots.txt', async function (req, res) {
+    res.sendFile(path.join(__dirname, './robots.txt'));
 });
 
-// nothing lol
+// API metadata
 app.get('/api', async function (req, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
-    res.json({
-        "unavailable": {
-            "main": false
-        },
-        "testing": {
-            "main": true
-        },
-        // todo: move to JSON file? preferabbly metadata.json if its not used
-        "version": {
-            "host": "temporary",
-            "string": "v2-legacy_intermediate",
-            "number": 2,
-            "start": "v2",
-            "agent": "Not set for this host"
-        }
-    });
+    res.sendFile(path.join(__dirname, './metadata.json'));
 });
 
 // security stuff i guess :idk_man:

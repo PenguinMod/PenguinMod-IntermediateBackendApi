@@ -1,1 +1,22 @@
-{}
+{
+    "unavailable": {
+        "main": false
+    },
+    "testing": {
+        "main": false
+    },
+    "documentation": {
+        "available": false,
+        "url": ""
+    },
+    "version": {
+        "host": "temporary",
+        "string": "v2-legacy_intermediate",
+        "number": 2,
+        "start": "v2",
+        "agent": {
+            "name": "Cloud-Server-1"
+        }
+    },
+    "detail": {}
+}
