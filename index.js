@@ -1,3 +1,5 @@
+// return;
+
 // todo: move to external file?
 const ApproverUsernames = [
     "JeremyGamer13",
@@ -312,16 +314,26 @@ app.get('/api/pmWrapper/scratchUserImage', async function (req, res) {
 app.get('/api/users/login', async function (req, res) {
     const privateCode = Cast.toString(req.query.privateCode);
     UserManager.verifyCode(privateCode).then(response => {
-        if (!response.valid) {
+        // check if it is a malicious site
+        // note: malicious sites cannot read the private code in the URL if it is the right redirect
+        //       thank you cors, you finally did something useful
+
+        // malicious APPS could, but at that point your just fucked so :idk_man:
+        const invalidRedirect = response.redirect !== 'https://projects.penguinmod.site/api/users/login';
+        if ((!response.valid) || (invalidRedirect)) {
             res.status(400);
             res.header("Content-Type", 'application/json');
             res.json({ "error": "InvalidLogin" });
+            if (invalidRedirect) {
+                console.log(invalidRedirect, "tried to falsely authenticate", response.username);
+            }
             return;
         }
         UserManager.setCode(response.username, privateCode);
-        res.header("Content-Type", 'application/json');
+        // close window by opening success.html
+        res.header("Content-Type", 'text/html');
         res.status(200);
-        res.json({ "success": "LoginSet" });
+        res.sendFile(path.join(__dirname, "./success.html"));
     }).catch(() => {
         res.status(400);
         res.header("Content-Type", 'application/json');
@@ -784,6 +796,14 @@ app.post('/api/projects/update', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return;
     }
+
+    if (UserManager.isBanned(packet.requestor)) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
     const db = new Database(`${__dirname}/projects/published.json`);
     const id = String(packet.id);
     if (!db.has(id)) {
