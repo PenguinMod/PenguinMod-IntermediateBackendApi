@@ -13,23 +13,23 @@
                 throw new Error('No parents');
             }
             
-            // wrapper to handle errors & be easier
-            function post(data) {
-                opener.postMessage(
-                    {
-                        a2: data,
-                    },
-                    'https://penguinmod.site'
-                );
-            }
+            setTimeout(() => {
+                // wrapper to handle errors & be easier
+                function post(data) {
+                    opener.postMessage(
+                        {
+                            a2: data,
+                        },
+                        'https://penguinmod.site'
+                    );
+                }
 
-            if (window.parent.origin === 'https://penguinmod.site') {
                 const searchParams = new URLSearchParams(location.search);
                 const privateCode = searchParams.get("privateCode");
                 post({
                     pv: privateCode
                 });
-            }
+            }, 500);
         </script>
     </body>
 </html>
