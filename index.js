@@ -17,6 +17,7 @@ const ApproverUsernames = [
 const DEBUG_logAllFailedData = false
 
 const fs = require("fs");
+const jimp = require("jimp");
 const Database = require("easy-json-database");
 const Cast = require("./classes/Cast.js");
 
@@ -213,14 +214,14 @@ app.get('/api/pmWrapper/projects', async function (req, res) {
 app.get('/api/pmWrapper/remixes', async function (req, res) {
     const packet = req.query
     if (!packet.id) {
-        res.status(400)
-        res.json({ "error": "IdNotSpecified" })
-        return
+        res.status(400);
+        res.json({ "error": "IdNotSpecified" });
+        return;
     }
-    const db = new Database(`${__dirname}/projects/published.json`)
+    const db = new Database(`${__dirname}/projects/published.json`);
     // we dont care about featured projects here because remixes cant be featured
     const json = db.all().map(value => { return value.data }).sort((project, sproject) => {
-        return sproject.date - project.date
+        return sproject.date - project.date;
     }).filter(proj => proj.remix == packet.id).filter(proj => proj.accepted == true);
     const projectsList = new ProjectList(json);
     const returning = projectsList.toJSON(true, Cast.toNumber(req.query.page));
@@ -230,16 +231,16 @@ app.get('/api/pmWrapper/remixes', async function (req, res) {
 })
 app.get('/api/pmWrapper/iconUrl', async function (req, res) {
     if (!req.query.id) {
-        res.status(400)
-        res.json({ "error": "IdNotSpecified" })
-        return
+        res.status(400);
+        res.json({ "error": "IdNotSpecified" });
+        return;
     }
-    const db = new Database(`${__dirname}/projects/published.json`)
-    const json = db.get(String(req.query.id))
+    const db = new Database(`${__dirname}/projects/published.json`);
+    const json = db.get(String(req.query.id));
     if (!json) {
-        res.status(400)
-        res.json({ "error": "IdNotValid" })
-        return
+        res.status(400);
+        res.json({ "error": "IdNotValid" });
+        return;
     }
     fs.readFile(`./projects/uploadedImages/p${json.id}.png`, (err, buffer) => {
         if (err) {
@@ -250,10 +251,22 @@ app.get('/api/pmWrapper/iconUrl', async function (req, res) {
             });
             return;
         }
-        res.status(200);
-        res.contentType('image/png');
-        res.send(buffer);
-    })
+        jimp.read(buffer).then(async image => {
+            const width = Cast.toBoolean(req.query.widescreen) ? 640 : 480;
+            image.cover(width / 2, 360 / 2);
+            const buffer = await image.getBufferAsync(jimp.MIME_JPEG);
+            res.status(200);
+            res.contentType(jimp.MIME_JPEG);
+            res.send(buffer);
+        }).catch(err => {
+            res.status(500);
+            res.json({
+                "error": "CompressionError",
+                "realerror": String(err)
+            });
+            return;
+        });
+    });
 })
 app.get('/api/pmWrapper/getProject', async function (req, res) {
     if (!req.query.id) {
@@ -271,44 +284,44 @@ app.get('/api/pmWrapper/getProject', async function (req, res) {
     res.status(200);
     res.json({ id: json.id, name: json.name, author: { id: -1, username: json.owner, } });
 })
-const CachedScratchUsers = {}
-let ScratchRequestQueue = 0
+// const CachedScratchUsers = {}
+// let ScratchRequestQueue = 0
 app.get('/api/pmWrapper/scratchUserImage', async function (req, res) {
-    // todo: rewrite to use trampoline from turbowarp
-    if (!req.query.username) {
-        res.status(400);
-        res.json({ "error": "UsernameNotSpecified" });
-        return;
-    }
-    const usableName = Cast.toString(req.query.username);
-    if (CachedScratchUsers[usableName] != null) {
-        const image = CachedScratchUsers[usableName];
-        res.status(200);
-        res.contentType('image/png');
-        res.send(image);
-        return;
-    }
-    if (ScratchRequestQueue < 0) ScratchRequestQueue = 0;
-    ScratchRequestQueue += 400;
-    setTimeout(() => {
-        ScratchRequestQueue -= 400;
-        fetch(`https://trampoline.turbowarp.org/avatars/by-username/${usableName}`).then(serverResponse => {
-            serverResponse.arrayBuffer().then(arrayBuffer => {
-                const buffer = Buffer.from(arrayBuffer);
-                CachedScratchUsers[usableName] = buffer;
-                res.status(200);
-                res.contentType('image/png');
-                res.send(buffer);
-            }).catch(err => {
-                res.status(500);
-                res.json({ error: "UnexpectedError", realerror: err });
-            });
-        }).catch(() => {
-            res.status(500);
-            res.json({ error: "FailedToAccessTrampoline" });
-            return;
-        })
-    }, ScratchRequestQueue);
+    Deprecation(res, "Use trampoline.turbowarp.org/avatars/by-username instead, this endpoint has been removed to reduce network usage.");
+    // if (!req.query.username) {
+    //     res.status(400);
+    //     res.json({ "error": "UsernameNotSpecified" });
+    //     return;
+    // }
+    // const usableName = Cast.toString(req.query.username);
+    // if (CachedScratchUsers[usableName] != null) {
+    //     const image = CachedScratchUsers[usableName];
+    //     res.status(200);
+    //     res.contentType('image/png');
+    //     res.send(image);
+    //     return;
+    // }
+    // if (ScratchRequestQueue < 0) ScratchRequestQueue = 0;
+    // ScratchRequestQueue += 400;
+    // setTimeout(() => {
+    //     ScratchRequestQueue -= 400;
+    //     fetch(`https://trampoline.turbowarp.org/avatars/by-username/${usableName}`).then(serverResponse => {
+    //         serverResponse.arrayBuffer().then(arrayBuffer => {
+    //             const buffer = Buffer.from(arrayBuffer);
+    //             CachedScratchUsers[usableName] = buffer;
+    //             res.status(200);
+    //             res.contentType('image/png');
+    //             res.send(buffer);
+    //         }).catch(err => {
+    //             res.status(500);
+    //             res.json({ error: "UnexpectedError", realerror: err });
+    //         });
+    //     }).catch(() => {
+    //         res.status(500);
+    //         res.json({ error: "FailedToAccessTrampoline" });
+    //         return;
+    //     })
+    // }, ScratchRequestQueue);
 })
 // scratch auth implementation
 app.get('/api/users/login', async function (req, res) {
@@ -563,7 +576,7 @@ app.get('/api/projects/approve', async function (req, res) {
             url: String("https://studio.penguinmod.site/#" + String(project.id)),
             author: {
                 name: String(project.owner).substring(0, 50),
-                icon_url: String("https://projects.penguinmod.site/api/pmWrapper/scratchUserImage?username=" + String(project.owner).substring(0, 50)),
+                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(project.owner).substring(0, 50)),
                 url: String("https://penguinmod.site/profile?user=" + String(project.owner).substring(0, 50))
             }
         }]
@@ -629,7 +642,7 @@ app.get('/api/projects/feature', async function (req, res) {
             url: String("https://studio.penguinmod.site/#" + String(project.id)),
             author: {
                 name: String(project.owner).substring(0, 50),
-                icon_url: String("https://projects.penguinmod.site/api/pmWrapper/scratchUserImage?username=" + String(project.owner).substring(0, 50)),
+                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(project.owner).substring(0, 50)),
                 url: String("https://penguinmod.site/profile?user=" + String(project.owner).substring(0, 50))
             }
         }]
@@ -698,7 +711,7 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
                     url: String("https://studio.penguinmod.site/#" + String(project.id)),
                     author: {
                         name: String(project.owner).substring(0, 50),
-                        icon_url: String("https://projects.penguinmod.site/api/pmWrapper/scratchUserImage?username=" + String(project.owner).substring(0, 50)),
+                        icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(project.owner).substring(0, 50)),
                         url: String("https://penguinmod.site/profile?user=" + String(project.owner).substring(0, 50))
                     }
                 }]

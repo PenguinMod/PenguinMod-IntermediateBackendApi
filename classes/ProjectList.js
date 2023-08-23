@@ -26,6 +26,7 @@ class ProjectList {
                 return clone;
             }),
             paginated: this.paginated,
+            listCount: this.projects.length,
             attributes: this.extraDetails,
         };
         if (applyPagination) {
