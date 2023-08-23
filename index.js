@@ -338,7 +338,7 @@ app.get('/api/users/login', async function (req, res) {
             res.header("Content-Type", 'application/json');
             res.json({ "error": "InvalidLogin" });
             if (invalidRedirect) {
-                console.log(invalidRedirect, "tried to falsely authenticate", response.username);
+                console.log(response.redirect, "tried to falsely authenticate", response.username);
             }
             return;
         }
