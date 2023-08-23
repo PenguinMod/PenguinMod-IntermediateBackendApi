@@ -342,6 +342,7 @@ app.get('/api/users/login', async function (req, res) {
             }
             return;
         }
+        // todo: we should clear the login after a couple days or so
         UserManager.setCode(response.username, privateCode);
         // close window by opening success.html
         res.header("Content-Type", 'text/html');
@@ -352,7 +353,19 @@ app.get('/api/users/login', async function (req, res) {
         res.header("Content-Type", 'application/json');
         res.json({ "error": "InvalidLogin" });
     })
-})
+});
+app.get('/api/users/logout', (req, res) => {
+    if (!UserManager.isCorrectCode(req.query.user, req.query.code)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidLogin" });
+        return;
+    }
+    UserManager.logoutUser(req.query.user);
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": "LoginIsNowInvalidated" });
+});
 app.get('/api/users/usernameFromCode', async function (req, res) {
     const privateCode = Cast.toString(req.query.privateCode);
     const username = UserManager.usernameFromCode(privateCode);
@@ -377,7 +390,7 @@ app.get('/api/users/getMyProjects', async function (req, res) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "Reauthenticate" });
-        return
+        return;
     }
     const db = new Database(`${__dirname}/projects/published.json`);
     const projects = db.all().map(data => data.data).filter(project => project.owner === req.query.user);

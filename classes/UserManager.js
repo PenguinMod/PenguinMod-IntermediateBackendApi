@@ -15,6 +15,8 @@ class UserManager {
         db.set("data", encrypt(JSON.stringify(UserManager._states)));
     }
     static deserialize() {
+        // todo: this data is not required for the api to run since clearing it just makes everyone have to log in again
+        // so we should handle errors and just reset the DB if it failed to deserialize
         const db = new Database(`./users.json`);
         if (!db.get("data")) return {};
         return ParseJSON(decrypt(db.get("data")));
@@ -33,6 +35,7 @@ class UserManager {
     static isCorrectCode(username, privateCode) {
         if (!privateCode) return false;
         if (!UserManager._states[username]) return false;
+        if (typeof UserManager._states[username] !== 'string') return false;
         return UserManager._states[username] == privateCode;
     }
     static usernameFromCode(privateCode) {
