@@ -1,7 +1,7 @@
 // return;
 
 // todo: move to external file?
-const ApproverUsernames = [
+const AdminAccountUsernames = [
     "JeremyGamer13",
     "JGamerTesting",
     "jwklongYT",
@@ -9,11 +9,19 @@ const ApproverUsernames = [
     "know0your0true0color",
     "hacker_anonimo",
     "ianyourgod",
-    "yeeter2001"
+    "yeeter2001",
     // add your scratch username here and you
-    // will be able to approve uploaded projects
-]
+    // will be able to use the admin panel
+];
 
+// todo: move to external file and/or add endpoint/method to add users
+const ApproverUsernames = [
+    "JGamerFunkin",
+    // add scratch usernames here and they
+    // will be able to approve uploaded projects
+];
+
+// TODO: this should be an ENV
 const DEBUG_logAllFailedData = false
 
 const fs = require("fs");
@@ -74,15 +82,15 @@ app.use(bodyParser.urlencoded({
 }));
 app.use(bodyParser.json({ limit: process.env.ServerSize }));
 
-app.get('/', async function (req, res) {
+app.get('/', async function (_, res) {
     res.redirect('https://projects.penguinmod.site/api');
 });
-app.get('/robots.txt', async function (req, res) {
+app.get('/robots.txt', async function (_, res) {
     res.sendFile(path.join(__dirname, './robots.txt'));
 });
 
 // API metadata
-app.get('/api', async function (req, res) {
+app.get('/api', async function (_, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.sendFile(path.join(__dirname, './metadata.json'));
@@ -171,7 +179,7 @@ app.get('/api/projects/getUnapproved', async function (req, res) {
         res.json({ "error": "Reauthenticate" })
         return
     }
-    if (!ApproverUsernames.includes(packet.user)) {
+    if (!AdminAccountUsernames.includes(packet.user)) {
         res.status(403)
         res.header("Content-Type", 'application/json');
         res.json({ "error": "ThisAccountCannotAccessThisInformation" })
@@ -210,7 +218,7 @@ app.get('/api/pmWrapper/projects', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.status(200)
     res.json(returning);
-})
+});
 app.get('/api/pmWrapper/remixes', async function (req, res) {
     const packet = req.query
     if (!packet.id) {
@@ -228,7 +236,7 @@ app.get('/api/pmWrapper/remixes', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.status(200);
     res.json(returning);
-})
+});
 app.get('/api/pmWrapper/iconUrl', async function (req, res) {
     if (!req.query.id) {
         res.status(400);
@@ -267,7 +275,7 @@ app.get('/api/pmWrapper/iconUrl', async function (req, res) {
             return;
         });
     });
-})
+});
 app.get('/api/pmWrapper/getProject', async function (req, res) {
     if (!req.query.id) {
         res.status(400);
@@ -283,7 +291,7 @@ app.get('/api/pmWrapper/getProject', async function (req, res) {
     }
     res.status(200);
     res.json({ id: json.id, name: json.name, author: { id: -1, username: json.owner, } });
-})
+});
 // const CachedScratchUsers = {}
 // let ScratchRequestQueue = 0
 app.get('/api/pmWrapper/scratchUserImage', async function (req, res) {
@@ -322,7 +330,7 @@ app.get('/api/pmWrapper/scratchUserImage', async function (req, res) {
     //         return;
     //     })
     // }, ScratchRequestQueue);
-})
+});
 // scratch auth implementation
 app.get('/api/users/login', async function (req, res) {
     const privateCode = Cast.toString(req.query.privateCode);
@@ -352,7 +360,7 @@ app.get('/api/users/login', async function (req, res) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "InvalidLogin" });
-    })
+    });
 });
 app.get('/api/users/logout', (req, res) => {
     if (!UserManager.isCorrectCode(req.query.user, req.query.code)) {
@@ -378,13 +386,21 @@ app.get('/api/users/usernameFromCode', async function (req, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "username": username });
-})
+});
 // extra stuff
 app.get('/api/users/isAdmin', async function (req, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
-    res.json({ "admin": ApproverUsernames.includes(req.query.username) });
-})
+    res.json({ "admin": AdminAccountUsernames.includes(req.query.username) });
+});
+app.get('/api/users/isApprover', async function (req, res) {
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({
+        "approver": ApproverUsernames.includes(req.query.username)
+            || AdminAccountUsernames.includes(req.query.username)
+    });
+});
 app.get('/api/users/getMyProjects', async function (req, res) {
     if (!UserManager.isCorrectCode(req.query.user, req.query.code)) {
         res.status(400);
@@ -481,7 +497,7 @@ app.get('/api/projects/approve', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return;
     }
-    if (!ApproverUsernames.includes(packet.approver)) {
+    if (!AdminAccountUsernames.includes(packet.approver)) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -610,7 +626,7 @@ app.get('/api/projects/feature', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return
     }
-    if (!ApproverUsernames.includes(packet.approver)) {
+    if (!AdminAccountUsernames.includes(packet.approver)) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -793,7 +809,7 @@ app.get('/api/projects/delete', async function (req, res) {
     }
     const project = db.get(String(packet.id))
     if (project.owner !== packet.approver) {
-        if (!ApproverUsernames.includes(packet.approver)) {
+        if (!AdminAccountUsernames.includes(packet.approver)) {
             res.status(403);
             res.header("Content-Type", 'application/json');
             res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -840,7 +856,7 @@ app.post('/api/projects/update', async function (req, res) {
     }
     const project = db.get(String(id));
     if (project.owner !== packet.requestor) {
-        if (!ApproverUsernames.includes(packet.requestor)) {
+        if (!AdminAccountUsernames.includes(packet.requestor)) {
             res.status(403);
             res.header("Content-Type", 'application/json');
             res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -926,7 +942,7 @@ app.post('/api/projects/update', async function (req, res) {
 const UploadsDisabled = false;
 app.post('/api/projects/publish', async function (req, res) {
     const packet = req.body;
-    if (UploadsDisabled && (!ApproverUsernames.includes(packet.author))) {
+    if (UploadsDisabled && (!AdminAccountUsernames.includes(packet.author))) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "PublishDisabled" });
