@@ -431,7 +431,7 @@ app.get('/api/users/getMyProjects', async function (req, res) {
     res.json(returning)
 })
 // store temporary data
-app.post('/api/users/store', async function (req, res) {
+app.post('/api/users/store', async function (_, res) {
     Deprecation(res, "Unused for quite some time, no longer needs to exist");
     // const packet = req.body;
     // if (!UserManager.isCorrectCode(packet.container, packet.token)) {
