@@ -1,4 +1,5 @@
 // return;
+require('dotenv').config();
 
 // todo: move to external file?
 const AdminAccountUsernames = [
@@ -44,6 +45,7 @@ const UserManager = require("./classes/UserManager.js");
 UserManager.load(); // should prevent logouts
 
 const ProjectList = require("./classes/ProjectList.js");
+const GenericList = require("./classes/GenericList.js");
 
 function DecryptArray(array) {
     const na = [];
@@ -179,7 +181,10 @@ app.get('/api/projects/getUnapproved', async function (req, res) {
         res.json({ "error": "Reauthenticate" })
         return
     }
-    if (!AdminAccountUsernames.includes(packet.user)) {
+    if (
+        !AdminAccountUsernames.includes(packet.user)
+        && !ApproverUsernames.includes(packet.user)
+    ) {
         res.status(403)
         res.header("Content-Type", 'application/json');
         res.json({ "error": "ThisAccountCannotAccessThisInformation" })
@@ -449,55 +454,144 @@ app.get('/api/users/getMyProjects', async function (req, res) {
 // store temporary data
 app.post('/api/users/store', async function (_, res) {
     Deprecation(res, "Unused for quite some time, no longer needs to exist");
-    // const packet = req.body;
-    // if (!UserManager.isCorrectCode(packet.container, packet.token)) {
-    //     res.status(400);
-    //     res.header("Content-Type", 'application/json');
-    //     res.json({ "error": "Reauthenticate" });
-    //     return
-    // }
-    // let success = true
-    // let error = null
-    // try {
-    //     StorageSpace.save(packet.container, packet.key, packet.value, true)
-    // } catch (err) {
-    //     success = false
-    //     error = err
-    // } finally {
-    //     if (!success) {
-    //         res.status(400)
-    //         res.header("Content-Type", 'application/json');
-    //         res.json({ "error": String(error) })
-    //         return
-    //     }
-    //     res.status(200)
-    //     res.header("Content-Type", 'application/json');
-    //     res.json({ "success": true })
-    // }
 });
 app.get('/api/users/getstore', async function (req, res) {
     Deprecation(res, "Unused for quite some time, no longer needs to exist");
-    // const packet = req.query
-    // if (!UserManager.isCorrectCode(packet.container, packet.token)) {
-    //     res.status(400)
-    //     res.header("Content-Type", 'application/json');
-    //     res.json({ "error": "Reauthenticate" })
-    //     return
-    // }
-    // res.status(200)
-    // res.header("Content-Type", 'application/json');
-    // res.json(StorageSpace.getContainer(packet.container))
 });
+
+// MESSAGES
+app.get('/api/users/getMessages', async function (req, res) {
+    const packet = req.query;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    const messages = UserManager.getMessages(packet.username);
+    const messageList = new GenericList(messages);
+    const returning = messageList.toJSON(true, Cast.toNumber(req.query.page));
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json(returning);
+});
+// we might not actually need this endpoint tbh
+app.post('/api/users/addMessage', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    // validate message (do we have perms? is this a valid message?)
+    const unsafeMessage = packet.message;
+    const invalidate = () => {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidMessage" });
+    };
+    const notallowed = () => {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "CannotSendThisMessageType" });
+    };
+
+    // is this actually a message object?
+    if (typeof unsafeMessage !== "object") return invalidate();
+    if (Array.isArray(unsafeMessage)) return invalidate();
+
+    // is the type of this message actually decided?
+    if (typeof unsafeMessage.type !== "string") return invalidate();
+
+    // check message type & add it
+    const username = packet.username;
+    const target = packet.target;
+    switch (unsafeMessage.type) {
+        case 'custom':
+            if (!AdminAccountUsernames.includes(username)) return notallowed();
+            if (typeof unsafeMessage.text !== "string") return invalidate();
+            UserManager.addMessage(target, {
+                type: unsafeMessage.type,
+                text: unsafeMessage.text
+            });
+            break;
+        default:
+            return invalidate();
+    }
+
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
+});
+app.get('/api/users/getMessageCount', async function (req, res) {
+    const packet = req.query;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    const messages = UserManager.getMessages(packet.username);
+    res.status(200);
+    res.header("Content-Type", 'text/plain');
+    res.send(String(messages.length));
+});
+app.post('/api/users/markMessagesAsRead', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (packet.id) {
+        UserManager.modifyMessage(packet.username, packet.id, (message) => ({
+            ...message,
+            read: true
+        }));
+        res.status(200);
+        res.header("Content-Type", 'application/json');
+        res.json({ "success": true });
+        return;
+    }
+    if (packet.ids) {
+        if (!Array.isArray(packet.ids)) {
+            res.status(400);
+            res.header("Content-Type", 'application/json');
+            res.json({ "error": "IDsMustBeArray" });
+            return;
+        }
+        for (const id of packet.ids) {
+            UserManager.modifyMessage(packet.username, id, (message) => ({
+                ...message,
+                read: true
+            }));
+        }
+        res.status(200);
+        res.header("Content-Type", 'application/json');
+        res.json({ "success": true });
+        return;
+    }
+    UserManager.markMessagesAsRead(packet.username);
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
+});
+
 // approve uploaded projects
 app.get('/api/projects/approve', async function (req, res) {
-    const packet = req.query
+    const packet = req.query;
     if (!UserManager.isCorrectCode(packet.approver, packet.passcode)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "Reauthenticate" });
         return;
     }
-    if (!AdminAccountUsernames.includes(packet.approver)) {
+    if (
+        !AdminAccountUsernames.includes(packet.approver)
+        && !ApproverUsernames.includes(packet.approver)
+    ) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -510,9 +604,6 @@ app.get('/api/projects/approve', async function (req, res) {
         res.json({ "error": "NotFound" });
         return;
     }
-
-    // todo: remove functionality to update metadata on approval?
-    //      this has been its own endpoint for a while now...
 
     // newMeta
     // replace
@@ -528,68 +619,52 @@ app.get('/api/projects/approve', async function (req, res) {
     project.updating = false;
     project.accepted = true;
     if (Cast.toBoolean(project.remix)) isRemix = true;
-    if (packet.newMeta != null) {
-        const newMetadata = SafeJSONParse(packet.newMeta);
-        // in this case we'll trust the approver to have put strings as the values
-        // all approvers can edit the database directly anyways so it doesnt really matter
-        if (newMetadata.name != null) {
-            project.name = newMetadata.name;
-        }
-        if (newMetadata.instructions != null) {
-            project.instructions = newMetadata.instructions;
-        }
-        if (newMetadata.notes != null) {
-            project.notes = newMetadata.notes;
-        }
-        // todo: editing images is not yet possible due to april 11th metadata corruption changing the project format
-        // if (newMetadata.image != null) {
-        //     project.image = newMetadata.image
-        // }
-    }
-    let shouldCreateBackup = false;
-    let isUpdatingProjectData = false;
-    let replacedWithId = 0;
-    if ((packet.replace != null) && (String((packet.replace == null) ? "" : packet.replace).replace(/ /gmi, "") !== "")) {
-        idToSetTo = Number(packet.replace);
-        if (!db.has(String(idToSetTo))) {
-            res.status(400);
-            res.header("Content-Type", 'application/json');
-            res.json({ "error": "CannotReplaceANonExistentProject" });
-            return;
-        }
-        const replacingProject = db.get(String(idToSetTo));
-        if (replacingProject.owner !== project.owner) {
-            res.status(400);
-            res.header("Content-Type", 'application/json');
-            res.json({ "error": "CannotReplaceProjectOwnedByAnotherPerson" });
-            // console.log("tried to replace", replacingProject.id, "with", project.id)
-            return;
-        }
-        isUpdated = true;
-        project.featured = replacingProject.featured;
-        console.log(packet.approver, "replaced", replacingProject.id, "with", project.id);
-        replacedWithId = project.id;
-        project.id = replacingProject.id;
-        shouldCreateBackup = true;
-        isUpdatingProjectData = true;
-    }
-    if (shouldCreateBackup) {
-        // ignore currenlty, we cant do this properly atm and we dont need to
-        // const backupFolder = `./projects/backup/Backup${idToSetTo}`;
-        // try {
-        //     fs.mkdirSync(backupFolder);
-        // } catch { };
-        // const dbEntry = db.get(String(idToSetTo));
-        // fs.writeFile(`${backupFolder}/entry.json`, JSON.stringify(dbEntry), err => { if (err) console.log("failed to create backup of db entry;", err) });
-        // const fileData = fs.readFileSync(`./projects/uploaded/p${idToSetTo}.txt`, "utf-8");
-        // fs.writeFile(`${backupFolder}/data.txt`, fileData, err => { if (err) console.log("failed to create backup of project data;", err) });
-    }
     db.set(String(idToSetTo), project);
-    if (isUpdatingProjectData) {
-        // uhh what the hell is this supposed to do?
-        // const fileData = fs.readFileSync(`./projects/uploaded/p${replacedWithId}.txt`, "utf-8");
-        // fs.writeFile(`./projects/uploaded/p${idToSetTo}.txt`, fileData, err => { if (err) console.log("failed to update project data;", err) });
+    
+    if (isRemix) {
+        if (db.has(String(project.remix))) {
+            const remixedProject = db.get(String(project.remix));
+            UserManager.addMessage(remixedProject.owner, {
+                type: "remix",
+                id: remixedProject.id,
+                name: `${remixedProject.name}`, // included for less API calls
+                remixId: project.id,
+                remixName: project.name,
+            });
+        }
     }
+
+    if (ApproverUsernames.includes(packet.approver)) {
+        // post log
+        const projectImage = String(`https://projects.penguinmod.site/api/pmWrapper/iconUrl?id=${project.id}&rn=${Math.round(Math.random() * 9999999)}`);
+        const body = JSON.stringify({
+            content: `"${project.name}" was approved by ${packet.approver}`,
+            embeds: [{
+                title: `${project.name} was approved`,
+                color: 0x00ff00,
+                image: { url: projectImage },
+                url: "https://studio.penguinmod.site/#" + project.id,
+                fields: [
+                    {
+                        name: "Approved by",
+                        value: `${packet.approver}`
+                    }
+                ],
+                author: {
+                    name: String(project.owner).substring(0, 50),
+                    icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(project.owner).substring(0, 50)),
+                    url: String("https://penguinmod.site/profile?user=" + String(project.owner).substring(0, 50))
+                },
+                timestamp: new Date().toISOString()
+            }]
+        });
+        fetch(process.env.ApproverLogWebhook, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(JSON.parse(body))
+        });
+    }
+
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
@@ -616,7 +691,113 @@ app.get('/api/projects/approve', async function (req, res) {
         body: JSON.stringify(JSON.parse(body))
     });
     // .then(res => res.text().then(t => console.log("WebhookResponse",res.status,t))).catch(err => console.log("FailedWebhookSend", err))
-})
+});
+app.post('/api/projects/reject', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.approver, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (
+        !AdminAccountUsernames.includes(packet.approver)
+        && !ApproverUsernames.includes(packet.approver)
+    ) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+    if (typeof packet.reason !== "string") {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "RejectionReasonIsRequired" });
+        return;
+    }
+    if (packet.reason.length < 10) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "RejectionReasonIsLessThan10Chars" });
+        return;
+    }
+    const db = new Database(`${__dirname}/projects/published.json`);
+    if (!db.has(String(packet.id))) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "NotFound" });
+        return;
+    }
+    const project = db.get(String(packet.id));
+    if (project.accepted) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "CannotRejectApprovedProject" });
+        return;
+    }
+    // post log
+    const body = JSON.stringify({
+        content: `"${project.name}" was rejected by ${packet.approver}`,
+        embeds: [{
+            title: `${project.name} was rejected`,
+            color: 0xff0000,
+            fields: [
+                {
+                    name: "Rejected by",
+                    value: `${packet.approver}`
+                },
+                {
+                    name: "Reason",
+                    value: `${packet.reason}`
+                }
+            ],
+            author: {
+                name: String(project.owner).substring(0, 50),
+                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(project.owner).substring(0, 50)),
+                url: String("https://penguinmod.site/profile?user=" + String(project.owner).substring(0, 50))
+            },
+            timestamp: new Date().toISOString()
+        }]
+    });
+    fetch(process.env.ApproverLogWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(JSON.parse(body))
+    });
+    // add message
+    UserManager.addModeratorMessage(project.owner, {
+        id: String(packet.id),
+        type: "reject",
+        name: `${project.name}`, // included for less API calls
+        reason: packet.reason,
+        disputable: true
+    });
+    db.delete(String(packet.id));
+    const projectFilePath = `./projects/uploaded/p${packet.id}.pmp`;
+    const projectImagePath = `./projects/uploadedImages/p${packet.id}.png`;
+    fs.readFile(projectFilePath, (err, data) => {
+        if (err) return console.log('failed to open project file for', packet.id, ', will not be deleted from rejection');
+        fs.writeFile(`./projects/backup/proj${packet.id}.pmp`, data, (err) => {
+            if (err) return console.log('failed to backup project file for', packet.id, ', will not be deleted from rejection');
+            fs.unlink(projectFilePath, err => {
+                if (err) console.log("failed to delete project data for", packet.id, ";", err);
+            });
+        });
+    });
+    fs.readFile(projectImagePath, (err, data) => {
+        if (err) return console.log('failed to open image for', packet.id, ', will not be deleted from rejection');
+        fs.writeFile(`./projects/backup/proj${packet.id}.png`, data, (err) => {
+            if (err) return console.log('failed to backup project image for', packet.id, ', will not be deleted from rejection');
+            fs.unlink(projectImagePath, err => {
+                if (err) console.log("failed to delete project image for", packet.id, ";", err);
+            });
+        });
+    });
+    console.log(packet.approver, "rejected", packet.id);
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
+});
 // feature uploaded projects
 app.get('/api/projects/feature', async function (req, res) {
     const packet = req.query;
@@ -656,6 +837,11 @@ app.get('/api/projects/feature', async function (req, res) {
     }
     project.featured = true;
     db.set(String(idToSetTo), project);
+    UserManager.addMessage(project.owner, {
+        type: "featured",
+        id: idToSetTo,
+        name: `${project.name}` // included for less API calls
+    });
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
@@ -727,6 +913,11 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
     if ((targetType === 'votes') && (project.votes.length >= 6)) {
         // people lik this project
         project.featured = true;
+        UserManager.addMessage(project.owner, {
+            type: "featured",
+            id: project.id,
+            name: `${project.name}` // included for less API calls
+        });
         if (project.featureWebhookSent !== true) {
             project.featureWebhookSent = true;
             const projectImage = String(`https://projects.penguinmod.site/api/pmWrapper/iconUrl?id=${project.id}&rn=${Math.round(Math.random() * 9999999)}`);
@@ -1061,6 +1252,58 @@ app.post('/api/projects/publish', async function (req, res) {
         return;
     }
 
+    // TODO: these should probably be required at some point
+    if (packet.rating) {
+        switch (packet.rating) {
+            case 'e': // everyone
+            case 'E': // everyone
+            case 'd': // E+10 everyone above 10yo
+            case 'D': // E+10 everyone above 10yo
+            case 't': // teens
+            case 'T': // teens
+                break;
+            default:
+                res.status(400);
+                res.header("Content-Type", 'application/json');
+                res.json({ "error": "InvalidRating" });
+                if (DEBUG_logAllFailedData) console.log("InvalidRating", packet);
+                return;
+        }
+    }
+    if (packet.restrictions && (!Array.isArray(packet.restrictions))) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidRestrictionFormat" });
+        if (DEBUG_logAllFailedData) console.log("InvalidRestrictionFormat", packet);
+        return;
+    }
+    if (packet.restrictions) {
+        const usedRestrictions = [];
+        for (const restriction of packet.restrictions) {
+            switch (restriction) {
+                case 'flash':
+                case 'blood':
+                case 'scary':
+                case 'swear':
+                    if (usedRestrictions.includes(restriction)) {
+                        res.status(400);
+                        res.header("Content-Type", 'application/json');
+                        res.json({ "error": "CanOnlyUseRestrictionOnce" });
+                        if (DEBUG_logAllFailedData) console.log("CanOnlyUseRestrictionOnce", packet);
+                        return;
+                    }
+                    usedRestrictions.push(restriction);
+                    break;
+                default:
+                    res.status(400);
+                    res.header("Content-Type", 'application/json');
+                    res.json({ "error": "InvalidRestriction" });
+                    if (DEBUG_logAllFailedData) console.log("InvalidRestriction", packet);
+                    return;
+            }
+        }
+    }
+
     // set cooldown
     db.set(packet.author, Date.now() + 480000);
 
@@ -1118,12 +1361,6 @@ app.get('/api/projects/getPublished', async function (req, res) {
     db = new Database(`${__dirname}` + "/projects/published" + ".json");
     if (db.has(String(req.query.id))) {
         const project = db.get(String(req.query.id));
-        // if (String(req.query.type) == "uri") {
-        //     res.status(200);
-        //     res.header("Content-Type", 'text/plain');
-        //     res.sendFile(`./projects/uploaded/p${project.id}.pmp`);
-        //     return;
-        // }
         if (String(req.query.type) == "file") {
             fs.readFile(`./projects/uploaded/p${project.id}.pmp`, (err, data) => {
                 if (err) {
@@ -1153,35 +1390,6 @@ app.get('/api/projects/getPublished', async function (req, res) {
         res.json({ "error": "NotFound" });
     }
 });
-// get project by id
-// app.get('/api/projects/get', async function(req, res) {
-//     if ((req.query.id) == null) {
-//         res.status(400)
-//         res.header("Content-Type", 'application/json');
-//         res.json({ "error": "NoIDSpecified" })
-//         return
-//     }
-//     db = new Database(`${__dirname}` + "/projects/published" + ".json");
-//     if (db.has(String(req.query.id))) {
-//         db = new Database(`${__dirname}` + "/projects/metadata" + ".json");
-//         item = db.get(String((req.query.id)));
-//         return
-//     }
-//     db = new Database(`${__dirname}` + "/projects/metadata" + ".json");
-//     if (db.has(String(req.query.id))) {
-//         res.status(200)
-//         item = db.get(String((req.query.id)));
-//         if ((req.query.json) == 'true') {
-//             res.header("Content-Type", 'application/json');
-//             res.sendFile(path.join(__dirname, (item.file)));
-//             return
-//         }
-//         res.json(item);
-//     } else {
-//         res.status(404)
-//         res.json({ "error": "NotFound" })
-//     }
-// })
 // sorts the projects into a nice array of pages
 app.get('/api/projects/paged', async function (req, res) {
     Deprecation(res, "Not useful if pagination requires multiple requests, use /search for filtering and /getApproved for normal list");
