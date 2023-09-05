@@ -367,6 +367,37 @@ app.get('/api/users/login', async function (req, res) {
         res.json({ "error": "InvalidLogin" });
     });
 });
+app.get('/api/users/loginLocal', async function (req, res) {
+    const privateCode = Cast.toString(req.query.privateCode);
+    UserManager.verifyCode(privateCode).then(response => {
+        // check if it is a malicious site
+        // note: malicious sites cannot read the private code in the URL if it is the right redirect
+        //       thank you cors, you finally did something useful
+
+        // malicious APPS could, but at that point your just fucked so :idk_man:
+        const invalidRedirect = response.redirect !== 'https://projects.penguinmod.site/api/users/loginLocal';
+        if ((!response.valid) || (invalidRedirect)) {
+            res.status(400);
+            res.header("Content-Type", 'application/json');
+            res.json({ "error": "InvalidLogin" });
+            if (invalidRedirect) {
+                console.log(response.redirect, "tried to falsely authenticate", response.username);
+            }
+            return;
+        }
+        // todo: we should clear the login after a couple days or so
+        UserManager.setCode(response.username, privateCode);
+        // close window by opening success.html
+        res.header("Content-Type", 'text/html');
+        res.status(200);
+        res.sendFile(path.join(__dirname, "./success_local.html"));
+    }).catch(() => {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidLogin" });
+    });
+});
+// logout
 app.get('/api/users/logout', (req, res) => {
     if (!UserManager.isCorrectCode(req.query.user, req.query.code)) {
         res.status(400);
