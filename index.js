@@ -609,6 +609,70 @@ app.post('/api/users/markMessagesAsRead', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
 });
+app.post('/api/users/dispute', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    const messages = UserManager.getMessages(packet.username);
+    const message = messages.filter(message => message.id === packet.id)[0];
+    if (!message) {
+        res.status(404);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "NotFound" });
+        return;
+    }
+    if (!message.disputable) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "MessageNotDisputable" });
+        return;
+    }
+
+    // post log
+    const body = JSON.stringify({
+        content: `${packet.username} would like to dispute`,
+        embeds: [{
+            title: `${project.name} was rejected`,
+            color: 0xff8800,
+            fields: [
+                {
+                    name: "Message Disputed",
+                    value: `${message.type} (${message.id})`
+                },
+                {
+                    name: "Dispute",
+                    value: `${packet.text}`
+                }
+            ],
+            author: {
+                name: String(packet.username).substring(0, 50),
+                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(packet.username).substring(0, 50)),
+                url: String("https://penguinmod.site/profile?user=" + String(packet.username).substring(0, 50))
+            },
+            timestamp: new Date().toISOString()
+        }]
+    });
+    fetch(process.env.ApproverLogWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(JSON.parse(body))
+    }).then(res => {
+        if (res.ok) {
+            UserManager.modifyMessage(packet.username, packet.id, message => {
+                message.disputable = false;
+                return message;
+            });
+        }
+    });
+
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
+});
 
 // approve uploaded projects
 app.get('/api/projects/approve', async function (req, res) {
