@@ -636,7 +636,7 @@ app.post('/api/users/dispute', async function (req, res) {
     const body = JSON.stringify({
         content: `${packet.username} would like to dispute`,
         embeds: [{
-            title: `${project.name} was rejected`,
+            title: `Dispute by ${packet.username}`,
             color: 0xff8800,
             fields: [
                 {
