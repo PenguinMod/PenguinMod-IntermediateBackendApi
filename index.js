@@ -641,7 +641,7 @@ app.post('/api/users/dispute', async function (req, res) {
             fields: [
                 {
                     name: "Message Disputed",
-                    value: `${message.type} (${message.id})`
+                    value: `${message.reason ? message.reason : ''}\n\n\`\`${message.type} (${message.id})\`\``
                 },
                 {
                     name: "Dispute",
@@ -715,7 +715,7 @@ app.get('/api/projects/approve', async function (req, res) {
     project.accepted = true;
     if (Cast.toBoolean(project.remix)) isRemix = true;
     db.set(String(idToSetTo), project);
-    
+
     if (isRemix) {
         if (db.has(String(project.remix))) {
             const remixedProject = db.get(String(project.remix));
