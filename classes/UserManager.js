@@ -84,6 +84,14 @@ class UserManager {
         }
         return messages;
     }
+    static getUnreadMessages(username) {
+        const db = new Database(`./usermessages.json`);
+        const messages = db.get(username);
+        if (!messages) {
+            return [];
+        }
+        return messages.filter(message => !message.read);
+    }
     static addMessage(username, message) {
         const db = new Database(`./usermessages.json`);
         const messages = db.get(username);

@@ -563,7 +563,7 @@ app.get('/api/users/getMessageCount', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return;
     }
-    const messages = UserManager.getMessages(packet.username);
+    const messages = UserManager.getUnreadMessages(packet.username);
     res.status(200);
     res.header("Content-Type", 'text/plain');
     res.send(String(messages.length));
