@@ -912,12 +912,15 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
     }
     if ((targetType === 'votes') && (project.votes.length >= 6)) {
         // people lik this project
+        let wasFeatured = project.featured;
         project.featured = true;
-        UserManager.addMessage(project.owner, {
-            type: "featured",
-            id: project.id,
-            name: `${project.name}` // included for less API calls
-        });
+        if (!wasFeatured) {
+            UserManager.addMessage(project.owner, {
+                type: "featured",
+                id: project.id,
+                name: `${project.name}` // included for less API calls
+            });
+        }
         if (project.featureWebhookSent !== true) {
             project.featureWebhookSent = true;
             const projectImage = String(`https://projects.penguinmod.site/api/pmWrapper/iconUrl?id=${project.id}&rn=${Math.round(Math.random() * 9999999)}`);
