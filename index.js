@@ -657,7 +657,7 @@ app.get('/api/projects/approve', async function (req, res) {
             const remixedProject = db.get(String(project.remix));
             UserManager.addMessage(remixedProject.owner, {
                 type: "remix",
-                id: remixedProject.id,
+                projectId: remixedProject.id,
                 name: `${remixedProject.name}`, // included for less API calls
                 remixId: project.id,
                 remixName: project.name,
@@ -797,7 +797,7 @@ app.post('/api/projects/reject', async function (req, res) {
     });
     // add message
     UserManager.addModeratorMessage(project.owner, {
-        id: String(packet.id),
+        projectId: String(packet.id),
         type: "reject",
         name: `${project.name}`, // included for less API calls
         reason: packet.reason,
@@ -870,7 +870,7 @@ app.get('/api/projects/feature', async function (req, res) {
     db.set(String(idToSetTo), project);
     UserManager.addMessage(project.owner, {
         type: "featured",
-        id: idToSetTo,
+        projectId: idToSetTo,
         name: `${project.name}` // included for less API calls
     });
     res.status(200);
@@ -948,7 +948,7 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
         if (!wasFeatured) {
             UserManager.addMessage(project.owner, {
                 type: "featured",
-                id: project.id,
+                projectId: project.id,
                 name: `${project.name}` // included for less API calls
             });
         }

@@ -96,8 +96,8 @@ class UserManager {
         const db = new Database(`./usermessages.json`);
         const messages = db.get(username);
         const newmessage = {
-            id: generateId(),
-            ...message
+            ...message,
+            id: generateId()
         };
         if (!messages) {
             db.set(username, [
