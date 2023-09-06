@@ -18,6 +18,11 @@ const AdminAccountUsernames = [
 // todo: move to external file and/or add endpoint/method to add users
 const ApproverUsernames = [
     "JGamerFunkin",
+    "G1nX",
+    "birdman2354",
+    "infintyrussia",
+    "Disheveled_cat",
+    "poprockdev",
     // add scratch usernames here and they
     // will be able to approve uploaded projects
 ];
