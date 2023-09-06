@@ -871,6 +871,7 @@ app.post('/api/projects/reject', async function (req, res) {
         type: "reject",
         name: `${project.name}`, // included for less API calls
         reason: packet.reason,
+        projectData: project,
         disputable: true
     });
     db.delete(String(packet.id));
