@@ -23,6 +23,7 @@ const ApproverUsernames = [
     "infintyrussia",
     "Disheveled_cat",
     "poprockdev",
+    "CMC_corp",
     // add scratch usernames here and they
     // will be able to approve uploaded projects
 ];
