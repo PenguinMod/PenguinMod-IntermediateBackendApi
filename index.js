@@ -665,19 +665,23 @@ app.post('/api/users/dispute', async function (req, res) {
     fetch(process.env.ApproverLogWebhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(JSON.parse(body))
-    }).then(res => {
-        if (res.ok) {
+        body
+    }).then(log => {
+        if (log.ok) {
             UserManager.modifyMessage(packet.username, packet.id, message => {
                 message.disputable = false;
                 return message;
             });
+
+            res.status(200);
+            res.header("Content-Type", 'application/json');
+            res.json({ "success": true });
+        } else {
+            res.status(500);
+            res.header('Content-Type', 'application/json')
+            res.json({ error: 'LogFailed' })
         }
     });
-
-    res.status(200);
-    res.header("Content-Type", 'application/json');
-    res.json({ "success": true });
 });
 
 // approve uploaded projects
