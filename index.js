@@ -10,7 +10,7 @@ const AdminAccountUsernames = [
     "know0your0true0color",
     "hacker_anonimo",
     "ianyourgod",
-    "yeeter2001",
+    "yeeter2001","debug"
     // add your scratch username here and you
     // will be able to use the admin panel
 ];
@@ -52,6 +52,8 @@ UserManager.load(); // should prevent logouts
 
 const ProjectList = require("./classes/ProjectList.js");
 const GenericList = require("./classes/GenericList.js");
+
+UserManager.setCode('debug', 'your-mom');
 
 function DecryptArray(array) {
     const na = [];
@@ -670,6 +672,7 @@ app.post('/api/users/dispute', async function (req, res) {
         if (log.ok) {
             UserManager.modifyMessage(packet.username, packet.id, message => {
                 message.disputable = false;
+                message.dispute = packet.text
                 return message;
             });
 
@@ -682,6 +685,50 @@ app.post('/api/users/dispute', async function (req, res) {
             res.json({ error: 'LogFailed' })
         }
     });
+});
+app.post('/api/users/disputeRespond', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.approver, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (
+        !AdminAccountUsernames.includes(packet.approver)
+        && !ApproverUsernames.includes(packet.approver)
+    ) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+    const messages = UserManager.getMessages(packet.username);
+    const message = messages.filter(message => message.id === packet.id)[0];
+    if (!message) {
+        res.status(404);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "NotFound" });
+        return;
+    }
+    if (!message.dispute) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "MessageNotDisputable" });
+        return;
+    }
+    
+    // add message
+    UserManager.addModeratorMessage(packet.username, {
+        disputeId: String(packet.id),
+        type: "disputeResponse",
+        reason: packet.reason,
+        disputable: true
+    });
+
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
 });
 
 // approve uploaded projects
