@@ -10,7 +10,7 @@ const AdminAccountUsernames = [
     "know0your0true0color",
     "hacker_anonimo",
     "ianyourgod",
-    "yeeter2001","debug"
+    "yeeter2001",//"debug"
     // add your scratch username here and you
     // will be able to use the admin panel
 ];
@@ -672,7 +672,7 @@ app.post('/api/users/dispute', async function (req, res) {
         if (log.ok) {
             UserManager.modifyMessage(packet.username, packet.id, message => {
                 message.disputable = false;
-                message.dispute = packet.text
+                message.dispute = packet.text ?? ''
                 return message;
             });
 
@@ -711,7 +711,7 @@ app.post('/api/users/disputeRespond', async function (req, res) {
         res.json({ "error": "NotFound" });
         return;
     }
-    if (!message.dispute) {
+    if (!message.type === 'reject') {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "MessageNotDisputable" });
