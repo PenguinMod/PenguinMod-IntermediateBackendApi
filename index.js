@@ -274,11 +274,20 @@ app.get('/api/pmWrapper/iconUrl', async function (req, res) {
         }
         jimp.read(buffer).then(async image => {
             const width = Cast.toBoolean(req.query.widescreen) ? 640 : 480;
-            image.cover(width / 2, 360 / 2);
-            const buffer = await image.getBufferAsync(jimp.MIME_JPEG);
-            res.status(200);
-            res.contentType(jimp.MIME_JPEG);
-            res.send(buffer);
+            image.cover(width / 2, 360 / 2, async (err, image) => {
+                if (err) {
+                    res.status(500);
+                    res.json({
+                        "error": "CompressionCroppingError",
+                        "realerror": String(err)
+                    });
+                    return;
+                }
+                const buffer = await image.getBufferAsync(jimp.MIME_JPEG);
+                res.status(200);
+                res.contentType(jimp.MIME_JPEG);
+                res.send(buffer);
+            });
         }).catch(err => {
             res.status(500);
             res.json({
@@ -1291,6 +1300,10 @@ app.post('/api/projects/update', async function (req, res) {
                     {
                         name: "Owner",
                         value: `${project.owner}`
+                    },
+                    {
+                        name: "ID",
+                        value: `${project.id}`
                     }
                 ],
                 author: {
@@ -1545,6 +1558,10 @@ app.post('/api/projects/publish', async function (req, res) {
                 {
                     name: "Owner",
                     value: `${packet.author}`
+                },
+                {
+                    name: "ID",
+                    value: `${id}`
                 }
             ],
             author: {
