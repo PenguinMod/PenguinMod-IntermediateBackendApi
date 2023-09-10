@@ -1530,7 +1530,7 @@ app.get('/api/projects/getPublished', async function (req, res) {
                 if (typeof project.views !== "number") {
                     project.views = 0;
                 }
-                if (typeof viewsIpStorage[Cast.toString(project.id)] === "undefined") {
+                if (!Array.isArray(viewsIpStorage[Cast.toString(project.id)])) {
                     viewsIpStorage[Cast.toString(project.id)] = [];
                 }
                 const ipStorage = viewsIpStorage[Cast.toString(project.id)];
