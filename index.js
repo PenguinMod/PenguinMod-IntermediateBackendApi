@@ -29,7 +29,7 @@ const ApproverUsernames = [
 ];
 
 // TODO: this should be an ENV
-const DEBUG_logAllFailedData = false
+const DEBUG_logAllFailedData = false;
 
 const fs = require("fs");
 const jimp = require("jimp");
@@ -53,7 +53,7 @@ UserManager.load(); // should prevent logouts
 const ProjectList = require("./classes/ProjectList.js");
 const GenericList = require("./classes/GenericList.js");
 
-UserManager.setCode('debug', 'your-mom');
+// UserManager.setCode('debug', 'your-mom');
 
 function DecryptArray(array) {
     const na = [];
@@ -129,12 +129,12 @@ app.get('/api/projects/getApproved', async function (req, res) {
     // because otherwise featured projects would come after normal projects
     const featuredProjects = [];
     const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
-        return sproject.date - project.date
+        return sproject.date - project.date;
     }).filter(proj => proj.accepted == true).filter(project => {
         if (project.featured) {
-            featuredProjects.push(project)
+            featuredProjects.push(project);
         }
-        return project.featured != true
+        return project.featured != true;
     });
     const returnArray = featuredProjects.concat(projects);
     // make project list
@@ -151,32 +151,32 @@ app.get('/api/projects/max', async function (req, res) {
         const db = new Database(`${__dirname}/projects/published.json`)
         // this is explained in paged api but basically just add normal projects to featured projects
         // because otherwise featured projects would come after normal projects
-        const featuredProjects = []
+        const featuredProjects = [];
         const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
-            return sproject.date - project.date
+            return sproject.date - project.date;
         }).filter(proj => proj.accepted == true).filter(project => {
             if (project.featured) {
-                featuredProjects.push(project)
+                featuredProjects.push(project);
             }
-            return project.featured != true
+            return project.featured != true;
         })
         if (String(req.query.featured) == "true") {
-            return featuredProjects
+            return featuredProjects;
         }
         if (String(req.query.hidefeatured) == "true") {
-            return projects
+            return projects;
         }
-        const returnArray = featuredProjects.concat(projects)
-        return returnArray
+        const returnArray = featuredProjects.concat(projects);
+        return returnArray;
     }
-    let count = Number(req.query.amount)
-    if (isNaN(count)) count = 0
-    if (!isFinite(count)) count = 0
-    if (count > 20) count = 20
-    count = Math.round(count)
+    let count = Number(req.query.amount);
+    if (isNaN(count)) count = 0;
+    if (!isFinite(count)) count = 0;
+    if (count > 20) count = 20;
+    count = Math.round(count);
     const arr = grabArray().slice(0, count);
     res.header("Content-Type", 'application/json');
-    res.status(200)
+    res.status(200);
     res.json(arr);
 })
 // get unapproved projects
@@ -184,24 +184,24 @@ app.get('/api/projects/getUnapproved', async function (req, res) {
     // 6/3/2023 unapproved projects are admin only
     const packet = req.query;
     if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
-        res.status(400)
+        res.status(400);
         res.header("Content-Type", 'application/json');
-        res.json({ "error": "Reauthenticate" })
-        return
+        res.json({ "error": "Reauthenticate" });
+        return;
     }
     if (
         !AdminAccountUsernames.includes(packet.user)
         && !ApproverUsernames.includes(packet.user)
     ) {
-        res.status(403)
+        res.status(403);
         res.header("Content-Type", 'application/json');
-        res.json({ "error": "ThisAccountCannotAccessThisInformation" })
-        return
+        res.json({ "error": "ThisAccountCannotAccessThisInformation" });
+        return;
     }
     const db = new Database(`${__dirname}/projects/published.json`)
     const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
-        return sproject.date - project.date
-    }).filter(proj => proj.accepted == false)
+        return sproject.date - project.date;
+    }).filter(proj => proj.accepted == false);
     const returnArray = projects;
     const projectsList = new ProjectList(returnArray);
     const returning = projectsList.toJSON(true, Cast.toNumber(req.query.page));
@@ -216,24 +216,24 @@ app.get('/api/pmWrapper/projects', async function (req, res) {
     // because otherwise featured projects would come after normal projects
     const featuredProjects = []
     const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
-        return sproject.date - project.date
+        return sproject.date - project.date;
     }).map(project => {
-        return { id: project.id, name: project.name, author: { username: project.owner }, accepted: project.accepted, featured: project.featured }
+        return { id: project.id, name: project.name, author: { username: project.owner }, accepted: project.accepted, featured: project.featured };
     }).filter(proj => proj.accepted == true).filter(project => {
         if (project.featured) {
-            featuredProjects.push(project)
+            featuredProjects.push(project);
         }
-        return project.featured != true
+        return project.featured != true;
     });
     const returnArray = featuredProjects.concat(projects);
     const projectsList = new ProjectList(returnArray);
     const returning = projectsList.toJSON(true, Cast.toNumber(req.query.page));
     res.header("Content-Type", 'application/json');
-    res.status(200)
+    res.status(200);
     res.json(returning);
 });
 app.get('/api/pmWrapper/remixes', async function (req, res) {
-    const packet = req.query
+    const packet = req.query;
     if (!packet.id) {
         res.status(400);
         res.json({ "error": "IdNotSpecified" });
@@ -293,14 +293,14 @@ app.get('/api/pmWrapper/getProject', async function (req, res) {
     if (!req.query.id) {
         res.status(400);
         res.json({ "error": "IdNotSpecified" });
-        return
+        return;
     }
     const db = new Database(`${__dirname}/projects/published.json`);
     const json = db.get(String(req.query.id));
     if (!json) {
         res.status(400);
         res.json({ "error": "IdNotValid" });
-        return
+        return;
     }
     res.status(200);
     res.json({ id: json.id, name: json.name, author: { id: -1, username: json.owner, } });
@@ -717,7 +717,7 @@ app.post('/api/users/disputeRespond', async function (req, res) {
         res.json({ "error": "MessageNotDisputable" });
         return;
     }
-    
+
     // add message
     UserManager.addModeratorMessage(packet.username, {
         disputeId: String(packet.id),
@@ -1507,7 +1507,9 @@ app.post('/api/projects/publish', async function (req, res) {
     console.log(packet.title, "was published!");
 })
 // gets a published project
+const viewsIpStorage = {};
 app.get('/api/projects/getPublished', async function (req, res) {
+    const requestIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     if ((req.query.id) == null) {
         res.status(400);
         res.header("Content-Type", 'application/json');
@@ -1528,7 +1530,14 @@ app.get('/api/projects/getPublished', async function (req, res) {
                 if (typeof project.views !== "number") {
                     project.views = 0;
                 }
-                project.views += 1;
+                if (typeof viewsIpStorage[Cast.toString(project.id)] === "undefined") {
+                    viewsIpStorage[Cast.toString(project.id)] = [];
+                }
+                const ipStorage = viewsIpStorage[Cast.toString(project.id)];
+                if (!ipStorage.includes(requestIp)) {
+                    project.views += 1;
+                    ipStorage.push(requestIp);
+                }
                 db.set(String(req.query.id), project);
                 res.status(200);
                 res.header("Content-Type", 'application/x.scratch.sb3');
