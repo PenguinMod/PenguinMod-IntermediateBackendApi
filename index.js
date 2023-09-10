@@ -1202,6 +1202,7 @@ app.post('/api/projects/update', async function (req, res) {
         return;
     }
     const project = db.get(String(id));
+    const projectWasApproved = project.accepted;
     if (project.owner !== packet.requestor) {
         if (!AdminAccountUsernames.includes(packet.requestor)) {
             res.status(403);
@@ -1278,6 +1279,35 @@ app.post('/api/projects/update', async function (req, res) {
         project.updating = true;
         project.date = Date.now();
     }
+    // if project is not accepted, make a log for approvers
+    if (projectWasApproved && !project.accepted) {
+        // post log
+        const body = JSON.stringify({
+            content: `"${project.name}" was updated by ${project.owner}`,
+            embeds: [{
+                title: `${project.name} was updated`,
+                color: 0x00bbff,
+                fields: [
+                    {
+                        name: "Owner",
+                        value: `${project.owner}`
+                    }
+                ],
+                author: {
+                    name: String(project.owner).substring(0, 50),
+                    icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(project.owner).substring(0, 50)),
+                    url: String("https://penguinmod.site/profile?user=" + String(project.owner).substring(0, 50))
+                },
+                timestamp: new Date().toISOString()
+            }]
+        });
+        fetch(process.env.ApproverLogWebhook, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: body
+        });
+    }
+    // set in DB
     db.set(String(id), project);
     console.log(packet.requestor, "updated", id);
     res.status(200);
@@ -1479,6 +1509,8 @@ app.post('/api/projects/publish', async function (req, res) {
     fs.writeFile(`./projects/uploadedImages/p${id}.png`, image, (err) => {
         if (err) console.error(err);
     });
+
+    // save in DB
     db.set(String(id), {
         id: id, // surprisingly this is useful to keep the id in the key named the id (unless my code is bad)
         name: packet.title,
@@ -1502,6 +1534,34 @@ app.post('/api/projects/publish', async function (req, res) {
         rating: packet.rating, // E, E+10, T ratings (or ? for old projects)
         restrictions: packet.restrictions, // array of restrictions on this project (ex: blood, flashing lights)
     })
+
+    // log for approvers
+    const body = JSON.stringify({
+        content: `"${packet.title}" was uploaded by ${packet.author}`,
+        embeds: [{
+            title: `${packet.title} was uploaded`,
+            color: 0x00bbff,
+            fields: [
+                {
+                    name: "Owner",
+                    value: `${packet.author}`
+                }
+            ],
+            author: {
+                name: String(packet.author).substring(0, 50),
+                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(packet.author).substring(0, 50)),
+                url: String("https://penguinmod.site/profile?user=" + String(packet.author).substring(0, 50))
+            },
+            timestamp: new Date().toISOString()
+        }]
+    });
+    fetch(process.env.ApproverLogWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: body
+    });
+
+    // actually say the thing!!!!!!!!!!
     res.status(200);
     res.json({ "published": id });
     console.log(packet.title, "was published!");
