@@ -55,6 +55,14 @@ const GenericList = require("./classes/GenericList.js");
 
 // UserManager.setCode('debug', 'your-mom');
 
+function EncryptArray(array) {
+    const na = [];
+    for (const value of array) {
+        const encrypted = encrypt(value);
+        na.push(encrypted);
+    }
+    return na;
+}
 function DecryptArray(array) {
     const na = [];
     for (const value of array) {
@@ -1050,7 +1058,7 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
         return;
     }
     // idk if db uses a reference to the object or not
-    const project = JSON.parse(JSON.stringify(db.get(idToSetTo)));
+    const project = structuredClone(db.get(idToSetTo));
     if ((packet.type === 'votes') && (!project.accepted)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
@@ -1061,17 +1069,26 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
     if (packet.type === 'votes') {
         targetType = 'votes';
     }
+    // old projects dont have these props set
     if (!Array.isArray(project[targetType])) {
         project[targetType] = [];
     }
+    // we add this
     const userValue = encrypt(username);
     let voted = true;
-    if (DecryptArray(project[targetType]).includes(username)) {
-        project[targetType].splice(project[targetType].indexOf(userValue), 1);
+    const decryptedUsernames = DecryptArray(project[targetType]);
+    if (decryptedUsernames.includes(username)) {
+        // remove the vote
+        const newArray = structuredClone(decryptedUsernames);
+        const idx = newArray.indexOf(username);
+        newArray.splice(idx, 1);
+        project[targetType] = EncryptArray(newArray);
         voted = false;
     } else {
+        // add encrypted name to the raw list, we dont need to edit decrypted
         project[targetType].push(userValue);
     }
+    console.log('updated', targetType, 'on', project.id, 'to', project[targetType].length);
     if ((targetType === 'votes') && (project.votes.length >= 6)) {
         // people lik this project
         let wasFeatured = project.featured;
