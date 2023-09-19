@@ -989,6 +989,10 @@ app.post('/api/projects/reject', async function (req, res) {
     db.delete(String(packet.id));
     const projectFilePath = `./projects/uploaded/p${packet.id}.pmp`;
     const projectImagePath = `./projects/uploadedImages/p${packet.id}.png`;
+    const backupProjectMetaPath = `./projects/backup/proj${packet.id}.json`;
+    fs.writeFile(backupProjectMetaPath, JSON.stringify(project, null, 4), 'utf8', (err) => {
+        if (err) return console.log('failed to backup project meta for', packet.id);
+    });
     fs.readFile(projectFilePath, (err, data) => {
         if (err) return console.log('failed to open project file for', packet.id, ', will not be deleted from rejection');
         fs.writeFile(`./projects/backup/proj${packet.id}.pmp`, data, (err) => {
