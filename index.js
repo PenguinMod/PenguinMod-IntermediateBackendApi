@@ -144,7 +144,10 @@ app.get('/api/projects/getApproved', async function (req, res) {
         }
         return project.featured != true;
     });
-    const returnArray = featuredProjects.concat(projects);
+    let returnArray = featuredProjects.concat(projects);
+    if (Cast.toBoolean(req.query.reverse)) {
+        returnArray = structuredClone(returnArray).reverse();
+    }
     // make project list
     // new ProjectList() with .toJSON will automatically cut the pages for us
     const projectsList = new ProjectList(returnArray);
@@ -210,7 +213,10 @@ app.get('/api/projects/getUnapproved', async function (req, res) {
     const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
         return sproject.date - project.date;
     }).filter(proj => proj.accepted == false);
-    const returnArray = projects;
+    let returnArray = projects;
+    if (Cast.toBoolean(req.query.reverse)) {
+        returnArray = structuredClone(returnArray).reverse();
+    }
     const projectsList = new ProjectList(returnArray);
     const returning = projectsList.toJSON(true, Cast.toNumber(req.query.page));
     res.header("Content-Type", 'application/json');
@@ -659,17 +665,21 @@ app.post('/api/users/dispute', async function (req, res) {
 
     // post log
     const body = JSON.stringify({
-        content: `${packet.username} would like to dispute`,
+        content: `${packet.username} replied to moderator message`,
         embeds: [{
-            title: `Dispute by ${packet.username}`,
+            title: `Reply by ${packet.username}`,
             color: 0xff8800,
             fields: [
                 {
-                    name: "Message Disputed",
+                    name: "Message Replied to",
                     value: `${message.reason ? message.reason : ''}\n\n\`\`${message.type} (${message.id})\`\``
                 },
                 {
-                    name: "Dispute",
+                    name: "Project ID (if applicable)",
+                    value: `${message.projectData ? message.projectData.id : '(not applicable)'}`
+                },
+                {
+                    name: "Reply",
                     value: `${packet.text}`
                 }
             ],
