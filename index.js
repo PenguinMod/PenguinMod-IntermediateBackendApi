@@ -753,6 +753,40 @@ app.post('/api/users/disputeRespond', async function (req, res) {
         disputable: true
     });
 
+    // post log
+    const body = JSON.stringify({
+        content: `${packet.approver} responded to reply from ${packet.username}`,
+        embeds: [{
+            title: `${packet.approver} responded to a reply`,
+            color: 0x6600ff,
+            fields: [
+                {
+                    name: "Message ID",
+                    value: `${message.id}`
+                },
+                {
+                    name: "Original Reply",
+                    value: `${message.dispute ? message.dispute : '(reply is too old, search message ID in logs)'}`
+                },
+                {
+                    name: "Moderator Reply",
+                    value: `${packet.reason}`
+                }
+            ],
+            author: {
+                name: String(packet.username).substring(0, 50),
+                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(packet.username).substring(0, 50)),
+                url: String("https://penguinmod.site/profile?user=" + String(packet.username).substring(0, 50))
+            },
+            timestamp: new Date().toISOString()
+        }]
+    });
+    fetch(process.env.ApproverLogWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(JSON.parse(body))
+    });
+
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
