@@ -1284,6 +1284,13 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
                 accepted: false,
                 featured: false
             }
+            if (usingData.owner) {
+                UserManager.addModeratorMessage(usingData.owner, {
+                    type: "restored",
+                    projectId,
+                    name: `${usingData.name}` // included for less API calls
+                });
+            }
             db.set(Cast.toString(projectId), usingData);
             return;
         }
@@ -1298,6 +1305,13 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
             ...projectMeta,
             accepted: false,
             featured: false
+        }
+        if (usingData.owner) {
+            UserManager.addModeratorMessage(usingData.owner, {
+                type: "restored",
+                projectId,
+                name: `${usingData.name}` // included for less API calls
+            });
         }
         db.set(Cast.toString(projectId), usingData);
     });
