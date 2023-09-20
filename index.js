@@ -1113,6 +1113,10 @@ app.post('/api/projects/reject', async function (req, res) {
                     value: `${packet.approver}`
                 },
                 {
+                    name: "Project ID",
+                    value: `${project.id}`
+                },
+                {
                     name: "Reason",
                     value: `${packet.reason}`
                 }
