@@ -1196,7 +1196,7 @@ app.get('/api/projects/downloadRejected', async function (req, res) {
             return;
         }
         res.status(200);
-        res.sendFile(projectDataPath);
+        res.sendFile(path.join(__dirname, projectDataPath));
     });
 });
 app.post('/api/projects/restoreRejected', async function (req, res) {
