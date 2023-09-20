@@ -20,7 +20,7 @@ const generateId = () => {
 
 class UserManager {
     static _states = {}
-    
+
     static async serialize() {
         const db = new Database(`./users.json`);
         db.set("data", encrypt(JSON.stringify(UserManager._states)));
@@ -32,7 +32,7 @@ class UserManager {
         if (!db.get("data")) return {};
         return ParseJSON(decrypt(db.get("data")));
     }
-    
+
     static load() {
         UserManager._states = UserManager.deserialize();
     }
@@ -42,7 +42,15 @@ class UserManager {
         if (db.get(String(username))) return true;
         return false;
     }
-    
+    static ban(username, reason) {
+        const db = new Database(`./banned.json`);
+        db.set(String(username), String(reason));
+    }
+    static unban(username) {
+        const db = new Database(`./banned.json`);
+        db.delete(String(username));
+    }
+
     static isCorrectCode(username, privateCode) {
         if (!privateCode) return false;
         if (!UserManager._states[username]) return false;

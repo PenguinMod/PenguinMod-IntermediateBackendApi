@@ -670,6 +670,15 @@ app.post('/api/users/ban', async function (req, res) {
     const bannedUser = Cast.toString(packet.target);
     const bannedReason = Cast.toString(packet.reason);
 
+    // ban
+    UserManager.ban(bannedUser, bannedReason);
+    // add message
+    UserManager.addModeratorMessage(bannedUser, {
+        type: "ban",
+        reason: packet.reason,
+        disputable: true
+    });
+
     // post log
     const body = JSON.stringify({
         content: `${bannedUser} was banned by ${packet.username}`,
@@ -700,13 +709,6 @@ app.post('/api/users/ban', async function (req, res) {
         body
     }).then(log => {
         if (log.ok) {
-            // add message
-            UserManager.addModeratorMessage(bannedUser, {
-                type: "ban",
-                reason: packet.reason,
-                disputable: true
-            });
-
             res.status(200);
             res.header("Content-Type", 'application/json');
             res.json({ "success": true });
@@ -741,6 +743,15 @@ app.post('/api/users/unban', async function (req, res) {
     const bannedUser = Cast.toString(packet.target);
     const bannedReason = Cast.toString(packet.reason);
 
+    // unban
+    UserManager.unban(bannedUser);
+    // add message
+    UserManager.addModeratorMessage(bannedUser, {
+        type: "unban",
+        reason: packet.reason,
+        disputable: false // why would you dispute an unban? lmfao
+    });
+
     // post log
     const body = JSON.stringify({
         content: `${bannedUser} was unbanned by ${packet.username}`,
@@ -771,13 +782,6 @@ app.post('/api/users/unban', async function (req, res) {
         body
     }).then(log => {
         if (log.ok) {
-            // add message
-            UserManager.addModeratorMessage(bannedUser, {
-                type: "unban",
-                reason: packet.reason,
-                disputable: false // why would you dispute an unban? lmfao
-            });
-
             res.status(200);
             res.header("Content-Type", 'application/json');
             res.json({ "success": true });
