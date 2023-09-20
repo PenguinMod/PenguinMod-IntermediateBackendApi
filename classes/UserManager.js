@@ -143,6 +143,15 @@ class UserManager {
         }
         db.set(username, messages.filter(message => message.id !== id));
     }
+    static getRawMessageData() {
+        const db = new Database(`./usermessages.json`);
+        const all = db.all();
+        const object = {};
+        for (const piece of all) {
+            object[piece.key] = piece.data;
+        }
+        return object;
+    }
     static markMessagesAsRead(username) {
         const db = new Database(`./usermessages.json`);
         const messages = db.get(username);

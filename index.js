@@ -640,6 +640,154 @@ app.post('/api/users/markMessagesAsRead', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
 });
+app.post('/api/users/ban', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (!AdminAccountUsernames.includes(packet.username)) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+    if (typeof packet.reason !== "string") {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "BanReasonIsRequired" });
+        return;
+    }
+    if (packet.reason.length < 10) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "BanReasonIsLessThan10Chars" });
+        return;
+    }
+
+    const bannedUser = Cast.toString(packet.target);
+    const bannedReason = Cast.toString(packet.reason);
+
+    // post log
+    const body = JSON.stringify({
+        content: `${bannedUser} was banned by ${packet.username}`,
+        embeds: [{
+            title: `${bannedUser} was banned`,
+            color: 0xff0000,
+            fields: [
+                {
+                    name: "Banned by",
+                    value: `${packet.username}`
+                },
+                {
+                    name: "Reason",
+                    value: `${bannedReason}`
+                }
+            ],
+            author: {
+                name: String(bannedUser).substring(0, 50),
+                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(bannedUser).substring(0, 50)),
+                url: String("https://penguinmod.site/profile?user=" + String(bannedUser).substring(0, 50))
+            },
+            timestamp: new Date().toISOString()
+        }]
+    });
+    fetch(process.env.ApproverLogWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body
+    }).then(log => {
+        if (log.ok) {
+            // add message
+            UserManager.addModeratorMessage(bannedUser, {
+                type: "ban",
+                reason: packet.reason,
+                disputable: true
+            });
+
+            res.status(200);
+            res.header("Content-Type", 'application/json');
+            res.json({ "success": true });
+        } else {
+            res.status(500);
+            res.header('Content-Type', 'application/json')
+            res.json({ error: 'LogFailed' })
+        }
+    });
+});
+app.post('/api/users/unban', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (!AdminAccountUsernames.includes(packet.username)) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+    if (typeof packet.reason !== "string") {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "UnbanReasonIsRequired" });
+        return;
+    }
+
+    const bannedUser = Cast.toString(packet.target);
+    const bannedReason = Cast.toString(packet.reason);
+
+    // post log
+    const body = JSON.stringify({
+        content: `${bannedUser} was unbanned by ${packet.username}`,
+        embeds: [{
+            title: `${bannedUser} was unbanned`,
+            color: 0x00ff00,
+            fields: [
+                {
+                    name: "Unbanned by",
+                    value: `${packet.username}`
+                },
+                {
+                    name: "Reason",
+                    value: `${bannedReason}`
+                }
+            ],
+            author: {
+                name: String(bannedUser).substring(0, 50),
+                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(bannedUser).substring(0, 50)),
+                url: String("https://penguinmod.site/profile?user=" + String(bannedUser).substring(0, 50))
+            },
+            timestamp: new Date().toISOString()
+        }]
+    });
+    fetch(process.env.ApproverLogWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body
+    }).then(log => {
+        if (log.ok) {
+            // add message
+            UserManager.addModeratorMessage(bannedUser, {
+                type: "unban",
+                reason: packet.reason,
+                disputable: false // why would you dispute an unban? lmfao
+            });
+
+            res.status(200);
+            res.header("Content-Type", 'application/json');
+            res.json({ "success": true });
+        } else {
+            res.status(500);
+            res.header('Content-Type', 'application/json')
+            res.json({ error: 'LogFailed' })
+        }
+    });
+});
 app.post('/api/users/dispute', async function (req, res) {
     const packet = req.body;
     if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
@@ -905,6 +1053,7 @@ app.get('/api/projects/approve', async function (req, res) {
     });
     // .then(res => res.text().then(t => console.log("WebhookResponse",res.status,t))).catch(err => console.log("FailedWebhookSend", err))
 });
+// reject projects
 app.post('/api/projects/reject', async function (req, res) {
     const packet = req.body;
     if (!UserManager.isCorrectCode(packet.approver, packet.passcode)) {
@@ -1012,6 +1161,144 @@ app.post('/api/projects/reject', async function (req, res) {
         });
     });
     console.log(packet.approver, "rejected", packet.id);
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
+});
+// RELATED TO ALREADY REJECTED PROJECTS
+app.get('/api/projects/downloadRejected', async function (req, res) {
+    const packet = req.query;
+    if (!UserManager.isCorrectCode(packet.approver, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (
+        !AdminAccountUsernames.includes(packet.approver)
+        && !ApproverUsernames.includes(packet.approver)
+    ) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+    const projectDataPath = `./projects/backup/proj${packet.id}.pmp`;
+    fs.readFile(projectDataPath, (err) => {
+        if (err) {
+            res.status(404);
+            res.header("Content-Type", 'application/json');
+            res.json({ "error": "ProjectNotFound" });
+            return;
+        }
+        res.status(200);
+        res.sendFile(projectDataPath);
+    });
+});
+app.post('/api/projects/restoreRejected', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.approver, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return
+    }
+    if (!AdminAccountUsernames.includes(packet.approver)) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
+    // attempt to restore
+    const db = new Database(`${__dirname}/projects/published.json`);
+    const projectId = packet.id;
+
+    const backupProjectFilePath = `./projects/backup/proj${projectId}.pmp`;
+    const backupProjectImagePath = `./projects/backup/proj${projectId}.png`;
+    const backupProjectMetaPath = `./projects/backup/proj${projectId}.json`;
+
+    const restoredProjectFilePath = `./projects/uploaded/p${projectId}.pmp`;
+    const restoredProjectImagePath = `./projects/uploadedImages/p${projectId}.png`;
+    // PROJECT FILE
+    fs.readFile(backupProjectFilePath, (err, data) => {
+        if (err) {
+            console.warn('couldnt restore file for', projectId, err);
+            return;
+        }
+        fs.writeFile(restoredProjectFilePath, data, (err) => {
+            if (err) {
+                console.warn('couldnt restore file for', projectId, err);
+                return;
+            }
+        })
+    });
+    // PROJECT IMAGE
+    fs.readFile(backupProjectImagePath, (err, data) => {
+        if (err) {
+            console.warn('couldnt restore image for', projectId, err);
+            return;
+        }
+        fs.writeFile(restoredProjectImagePath, data, (err) => {
+            if (err) {
+                console.warn('couldnt restore image for', projectId, err);
+                return;
+            }
+        })
+    });
+    // PROJECT META
+    fs.readFile(backupProjectMetaPath, 'utf8', (err, data) => {
+        if (err) {
+            // search userMessages instead
+            let projectMetadata = {
+                "id": projectId,
+                "name": "Unknown Project " + projectId,
+                "instructions": "",
+                "notes": "This project was restored, but it's information was missing or corrupted.\nPlease edit the project to restore this information.",
+                "owner": packet.approver, // we dont know the owner
+                "featured": false,
+                "accepted": false,
+                "date": Date.now(),
+                "views": 0,
+                "loves": [],
+                "votes": [],
+                "updating": false
+            };
+            const messageData = UserManager.getRawMessageData();
+            for (const username in messageData) {
+                for (const message of messageData[username]) {
+                    if (message.type === 'reject' && message.projectData) {
+                        if (message.projectData.id === projectId) {
+                            projectMetadata = message.projectData;
+                            break;
+                        }
+                    }
+                }
+            }
+            const usingData = {
+                ...projectMetadata,
+                accepted: false,
+                featured: false
+            }
+            db.set(Cast.toString(projectId), usingData);
+            return;
+        }
+        let projectMeta;
+        try {
+            projectMeta = JSON.parse(data);
+        } catch (err) {
+            console.warn('couldnt restore metadata for', projectId, err);
+            return;
+        }
+        const usingData = {
+            ...projectMeta,
+            accepted: false,
+            featured: false
+        }
+        db.set(Cast.toString(projectId), usingData);
+    });
+
+    // valid info
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
