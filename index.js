@@ -26,7 +26,7 @@ const ApproverUsernames = [
     "CMC_corp",
 
     "insanetaco2000",
-    "PuzzlingGGG",
+    "puzzlingGGG",
     "ItzzEndr",
     "TheShovel",
     "Dicuorooja",
