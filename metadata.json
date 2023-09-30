@@ -10,12 +10,12 @@
         "url": ""
     },
     "version": {
-        "host": "temporary",
+        "host": "local",
         "string": "v2.1.0-legacy_intermediate",
         "number": 2,
         "start": "v2.1.0",
         "agent": {
-            "name": "Cloud-Server-2"
+            "name": "Local-Server-1"
         }
     },
     "detail": {}
