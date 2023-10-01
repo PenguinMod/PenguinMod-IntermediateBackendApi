@@ -463,7 +463,7 @@ app.get('/api/users/usernameFromCode', async function (req, res) {
     res.json({ 
         "username": username, 
         "admin": AdminAccountUsernames.includes(username),
-        "approver": ApproverUsernames.includes(req.query.username) 
+        "approver": ApproverUsernames.includes(username)
     });   
 });
 // extra stuff
