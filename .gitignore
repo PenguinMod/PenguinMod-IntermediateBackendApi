@@ -16,3 +16,6 @@ cooldown.json
 banned.json
 users.json
 usermessages.json
+
+# Projects
+projects/*
