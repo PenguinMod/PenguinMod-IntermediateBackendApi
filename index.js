@@ -120,6 +120,10 @@ app.use((req, res, next) => {
     next();
 });
 app.use(rateLimit({
+    validate: {
+        trustProxy: true,
+        xForwardedForHeader: true,
+    },
     windowMs: 5000,  // 150 requests per 5 seconds
     limit: 150,
     standardHeaders: 'draft-7',
