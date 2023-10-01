@@ -1,0 +1,25 @@
+{
+  "debug": [
+    {
+      "disputeId": "NzE0NjkuNDYxODE0MjQ4ODkuMzAzOTcuNzQ2MDgxOTYwNjY0LjMzOTI5LjU1ODc0OTM1NTY4LjU3NTE3Ljg0NDgyMDQ1ODQ1",
+      "type": "disputeResponse",
+      "disputable": true,
+      "moderator": true,
+      "id": "NTcyNzAuNjg5MzUzNDg3MzYuNzA3MTYuNzE4OTQyOTYyMzQuNDA2MzIuNjQ1MDIwNTcyOTEuNjc3ODkuMjI2MDUwMDU1ODI="
+    },
+    {
+      "projectId": "test",
+      "type": "reject",
+      "name": "undefined",
+      "reason": "your moma is SO fat she DIED",
+      "projectData": {
+        "accepted": false,
+        "owner": "debug"
+      },
+      "disputable": false,
+      "dispute": "YOUR MOM",
+      "moderator": true,
+      "id": "NzE0NjkuNDYxODE0MjQ4ODkuMzAzOTcuNzQ2MDgxOTYwNjY0LjMzOTI5LjU1ODc0OTM1NTY4LjU3NTE3Ljg0NDgyMDQ1ODQ1"
+    }
+  ]
+}

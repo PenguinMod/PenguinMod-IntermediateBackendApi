@@ -460,7 +460,11 @@ app.get('/api/users/usernameFromCode', async function (req, res) {
     }
     res.status(200);
     res.header("Content-Type", 'application/json');
-    res.json({ "username": username, "admin": AdminAccountUsernames.includes(username) });   
+    res.json({ 
+        "username": username, 
+        "admin": AdminAccountUsernames.includes(username),
+        "approver": ApproverUsernames.includes(req.query.username) 
+    });   
 });
 // extra stuff
 app.get('/api/users/isAdmin', async function (req, res) {
