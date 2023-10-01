@@ -39,6 +39,8 @@ const ApproverUsernames = [
     // will be able to approve uploaded projects
 ];
 
+const BlockedIPs = [];
+
 // TODO: this should be an ENV
 const DEBUG_logAllFailedData = false;
 
@@ -110,6 +112,10 @@ app.use(bodyParser.urlencoded({
     extended: false
 }));
 app.use(bodyParser.json({ limit: process.env.ServerSize }));
+app.use((req, res, next) => {
+    if (BlockedIPs.includes(req.headers['Cf-Connecting-Ip'])) return res.sendStatus(403);
+    next();
+})
 
 app.get('/', async function (_, res) {
     res.redirect('https://projects.penguinmod.site/api');
