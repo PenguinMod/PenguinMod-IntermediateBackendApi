@@ -13,3 +13,6 @@ System Volume Information
 
 # Database Files
 cooldown.json
+banned.json
+users.json
+usermessages.json
