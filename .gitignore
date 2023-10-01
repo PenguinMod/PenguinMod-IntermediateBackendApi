@@ -1,3 +1,15 @@
+# Tokens
 .env
+
+# Node
 node_modules
 package-lock.json
+
+# macOS
+.DS_Store
+
+# Windows
+System Volume Information
+
+# Database Files
+cooldown.json
