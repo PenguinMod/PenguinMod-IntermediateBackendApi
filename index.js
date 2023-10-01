@@ -53,6 +53,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 const app = express();
 const port = 8080;
 
@@ -118,6 +119,12 @@ app.use((req, res, next) => {
     console.log(`${clientIP}: ${req.originalUrl}`);
     next();
 });
+app.use(rateLimit({
+    windowMs: 5000,  // 150 requests per 5 seconds
+    limit: 150,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+}));
 
 app.get('/', async function (_, res) {
     res.redirect('https://projects.penguinmod.site/api');
