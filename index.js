@@ -10,7 +10,10 @@ const AdminAccountUsernames = [
     "know0your0true0color",
     "hacker_anonimo",
     "ianyourgod",
-    "yeeter2001",//"debug"
+    "yeeter2001",
+
+    // "debug",
+
     // add your scratch username here and you
     // will be able to use the admin panel
 ];
@@ -383,7 +386,7 @@ app.get('/api/users/login', async function (req, res) {
         // note: malicious sites cannot read the private code in the URL if it is the right redirect
         //       thank you cors, you finally did something useful
 
-        // malicious APPS could, but at that point your just fucked so :idk_man:
+        // malicious APPS could, but at that point your just :trollface:d so :idk_man:
         const invalidRedirect = response.redirect !== 'https://projects.penguinmod.site/api/users/login';
         if ((!response.valid) || (invalidRedirect)) {
             res.status(400);
@@ -413,8 +416,10 @@ app.get('/api/users/loginLocal', async function (req, res) {
         // note: malicious sites cannot read the private code in the URL if it is the right redirect
         //       thank you cors, you finally did something useful
 
-        // malicious APPS could, but at that point your just fucked so :idk_man:
-        const invalidRedirect = response.redirect !== 'https://projects.penguinmod.site/api/users/loginLocal';
+        // malicious APPS could, but at that point your just :trollface:d so :idk_man:
+        const invalidRedirect =
+            response.redirect !== 'https://projects.penguinmod.site/api/users/loginLocal'
+            && response.redirect !== 'http://localhost:8080/api/users/loginLocal';
         if ((!response.valid) || (invalidRedirect)) {
             res.status(400);
             res.header("Content-Type", 'application/json');
@@ -460,11 +465,11 @@ app.get('/api/users/usernameFromCode', async function (req, res) {
     }
     res.status(200);
     res.header("Content-Type", 'application/json');
-    res.json({ 
-        "username": username, 
+    res.json({
+        "username": username,
         "admin": AdminAccountUsernames.includes(username),
         "approver": ApproverUsernames.includes(username)
-    });   
+    });
 });
 // extra stuff
 app.get('/api/users/isAdmin', async function (req, res) {
@@ -652,6 +657,77 @@ app.post('/api/users/markMessagesAsRead', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
 });
+
+// BADGES
+app.get('/api/users/getBadges', async function (req, res) {
+    const packet = req.query;
+    if (typeof packet.username !== "string") {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "UsernameMustBeString" });
+        return;
+    }
+    if (!packet.username) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "UsernameNotSpecified" });
+        return;
+    }
+    const badges = UserManager.getProperty(packet.username, "badges");
+    if (!Array.isArray(badges)) {
+        res.status(200);
+        res.header("Content-Type", 'application/json');
+        res.json([]);
+        return;
+    }
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json(badges);
+});
+app.post('/api/users/setBadges', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (!AdminAccountUsernames.includes(packet.username)) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+    const newBadges = packet.badges;
+    const target = packet.target;
+    if (typeof target !== "string") {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "TargetMustBeString" });
+        return;
+    }
+    if (!target) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "TargetNotSpecified" });
+        return;
+    }
+    if (!Array.isArray(newBadges)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "BadgesMustBeArray" });
+        return;
+    }
+    UserManager.setProperty(target, "badges", newBadges);
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({
+        success: true,
+        newbadges: UserManager.getProperty(target, "badges")
+    });
+});
+
+// banning
 app.post('/api/users/ban', async function (req, res) {
     const packet = req.body;
     if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
@@ -804,6 +880,8 @@ app.post('/api/users/unban', async function (req, res) {
         }
     });
 });
+
+
 app.post('/api/users/dispute', async function (req, res) {
     const packet = req.body;
     if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
