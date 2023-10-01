@@ -119,6 +119,7 @@ app.use((req, res, next) => {
     console.log(`${clientIP}: ${req.originalUrl}`);
     next();
 });
+app.set('trust proxy', 1);
 app.use(rateLimit({
     validate: {
         trustProxy: true,
