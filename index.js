@@ -113,9 +113,11 @@ app.use(bodyParser.urlencoded({
 }));
 app.use(bodyParser.json({ limit: process.env.ServerSize }));
 app.use((req, res, next) => {
-    if (BlockedIPs.includes(req.headers['Cf-Connecting-Ip'])) return res.sendStatus(403);
+    let clientIP = req.headers['Cf-Connecting-Ip'] || req.socket.remoteAddress;
+    if (BlockedIPs.includes(clientIP)) return res.sendStatus(403);
+    console.log(`${clientIP}: ${req.originalUrl}`);
     next();
-})
+});
 
 app.get('/', async function (_, res) {
     res.redirect('https://projects.penguinmod.site/api');
