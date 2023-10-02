@@ -132,7 +132,22 @@ app.use(rateLimit({
 }));
 
 app.get('/', async function (_, res) {
-    res.redirect('https://projects.penguinmod.site/api');
+    res.redirect('https://penguinmod.site');
+});
+const projectTemplate = fs.readFileSync('./project.html').toString()
+app.get('/:id', async function (req, res) {
+    const db = new Database(`${__dirname}/projects/published.json`);
+    const json = db.get(String(req.params.id));
+    if (!json) {
+        res.sendFile(path.join(__dirname, './404-noproject.html'));
+        return;
+    }
+    res.status(200);
+    let html = projectTemplate
+    for (const prop in json) {
+        html = html.replaceAll(`{project.${prop}}`, json[prop])
+    }
+    res.send(html)
 });
 app.get('/robots.txt', async function (_, res) {
     res.sendFile(path.join(__dirname, './robots.txt'));
