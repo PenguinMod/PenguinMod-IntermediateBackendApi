@@ -114,7 +114,7 @@ app.use(bodyParser.urlencoded({
 }));
 app.use(bodyParser.json({ limit: process.env.ServerSize }));
 app.use((req, res, next) => {
-    let clientIP = req.headers['Cf-Connecting-Ip'] || req.socket.remoteAddress;
+    let clientIP = req.ip;
     if (BlockedIPs.includes(clientIP)) return res.sendStatus(403);
     console.log(`${clientIP}: ${req.originalUrl}`);
     next();
@@ -2070,7 +2070,7 @@ app.post('/api/projects/publish', async function (req, res) {
 // gets a published project
 const viewsIpStorage = {};
 app.get('/api/projects/getPublished', async function (req, res) {
-    const requestIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const requestIp = req.ip;
     if ((req.query.id) == null) {
         res.status(400);
         res.header("Content-Type", 'application/json');
