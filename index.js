@@ -66,7 +66,6 @@ UserManager.load(); // should prevent logouts
 
 const ProjectList = require("./classes/ProjectList.js");
 const GenericList = require("./classes/GenericList.js");
-const { escape } = require('querystring');
 
 // UserManager.setCode('debug', 'your-mom');
 
@@ -106,12 +105,12 @@ function Deprecation(res, reason = "") {
 }
 function escapeXML(unsafe) {
     if (typeof unsafe !== 'string') {
-        if (Array.isArray(unsafe)) {
+        if (unsafe) {
             // This happens when we have hacked blocks from 2.0
             // See #1030
             unsafe = String(unsafe);
         } else {
-            log.error(`Unexptected type ${typeof unsafe} in xmlEscape at: ${new Error().stack}`)
+            console.error(`Unexptected type ${typeof unsafe} in xmlEscape at: ${new Error().stack}`)
             return unsafe;
         }
     }
