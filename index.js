@@ -39,7 +39,7 @@ const ApproverUsernames = [
     // will be able to approve uploaded projects
 ];
 
-const BlockedIPs = [];
+const BlockedIPs = require("./blockedips.json");
 
 // TODO: this should be an ENV
 const DEBUG_logAllFailedData = false;
@@ -116,12 +116,12 @@ function escapeXML(unsafe) {
     }
     return unsafe.replace(/[<>&'"\n]/g, c => {
         switch (c) {
-        case '<': return '&lt;';
-        case '>': return '&gt;';
-        case '&': return '&amp;';
-        case '\'': return '&apos;';
-        case '"': return '&quot;';
-        case '\n': return '&#10;'
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '&': return '&amp;';
+            case '\'': return '&apos;';
+            case '"': return '&quot;';
+            case '\n': return '&#10;'
         }
     });
 };

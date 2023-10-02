@@ -17,5 +17,8 @@ banned.json
 users.json
 usermessages.json
 
+# Extra
+blockedips.json
+
 # Projects
 projects/*
