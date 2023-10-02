@@ -66,6 +66,7 @@ UserManager.load(); // should prevent logouts
 
 const ProjectList = require("./classes/ProjectList.js");
 const GenericList = require("./classes/GenericList.js");
+const { escape } = require('querystring');
 
 // UserManager.setCode('debug', 'your-mom');
 
@@ -103,6 +104,27 @@ function Deprecation(res, reason = "") {
         reason
     });
 }
+function escapeXML(unsafe) {
+    if (typeof unsafe !== 'string') {
+        if (Array.isArray(unsafe)) {
+            // This happens when we have hacked blocks from 2.0
+            // See #1030
+            unsafe = String(unsafe);
+        } else {
+            log.error(`Unexptected type ${typeof unsafe} in xmlEscape at: ${new Error().stack}`)
+            return unsafe;
+        }
+    }
+    return unsafe.replace(/[<>&'"]/g, c => {
+        switch (c) {
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '&': return '&amp;';
+        case '\'': return '&apos;';
+        case '"': return '&quot;';
+        }
+    });
+};
 
 app.use(cors({
     origin: '*',
@@ -145,7 +167,7 @@ app.get('/:id', async function (req, res) {
     res.status(200);
     let html = projectTemplate
     for (const prop in json) {
-        html = html.replaceAll(`{project.${prop}}`, json[prop])
+        html = html.replaceAll(`{project.${prop}}`, escapeXML(json[prop]))
     }
     res.send(html)
 });
