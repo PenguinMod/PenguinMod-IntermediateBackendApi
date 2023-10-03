@@ -156,6 +156,17 @@ app.use(rateLimit({
 app.get('/', async function (_, res) {
     res.redirect('https://penguinmod.site');
 });
+app.get('/robots.txt', async function (_, res) {
+    res.sendFile(path.join(__dirname, './robots.txt'));
+});
+
+// API metadata
+app.get('/api', async function (_, res) {
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.sendFile(path.join(__dirname, './metadata.json'));
+});
+
 const projectTemplate = fs.readFileSync('./project.html').toString()
 app.get('/:id', async function (req, res) {
     const db = new Database(`${__dirname}/projects/published.json`);
@@ -170,16 +181,6 @@ app.get('/:id', async function (req, res) {
         html = html.replaceAll(`{project.${prop}}`, escapeXML(json[prop]))
     }
     res.send(html)
-});
-app.get('/robots.txt', async function (_, res) {
-    res.sendFile(path.join(__dirname, './robots.txt'));
-});
-
-// API metadata
-app.get('/api', async function (_, res) {
-    res.status(200);
-    res.header("Content-Type", 'application/json');
-    res.sendFile(path.join(__dirname, './metadata.json'));
 });
 
 // security stuff i guess :idk_man:
