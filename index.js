@@ -166,7 +166,10 @@ app.get('/api', async function (_, res) {
     res.header("Content-Type", 'application/json');
     res.sendFile(path.join(__dirname, './metadata.json'));
 });
-
+// PING COMMAND TO CHECK IF API IS WORKING (LOL)
+app.get('/api/ping', async function (_, res) {
+    res.send("Pong!")
+});
 const projectTemplate = fs.readFileSync('./project.html').toString()
 app.get('/:id', async function (req, res) {
     const db = new Database(`${__dirname}/projects/published.json`);
