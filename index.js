@@ -33,7 +33,7 @@ const ApproverUsernames = [
     "ItzzEndr",
     "TheShovel",
     "Dicuorooja",
-    "Something_nice",
+    "something_nice",
     "booger444",
     // add scratch usernames here and they
     // will be able to approve uploaded projects
