@@ -53,6 +53,18 @@ class ProjectList {
         return json;
     }
     /**
+     * Converts this project list to an array, with options allowed.
+     * Uses this.toJSON
+     * @param {boolean?} applyPagination Determines whether or not to only include the specified page.
+     * @param {number?} page 0-indexed page on where to cut.
+     * @param {number?} pageLength The length of each page. If not specified, this.pageLength will be used.
+     * @returns {Array} Array of projects
+     */
+    toArray(...args) {
+        const json = this.toJSON(...args);
+        return json.projects;
+    }
+    /**
      * Converts this project list to a JSON string, with options allowed.
      * Uses this.toJSON
      * @param {boolean?} applyPagination Determines whether or not to only include the specified page.

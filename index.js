@@ -255,12 +255,15 @@ app.get('/api/projects/max', async function (req, res) {
     let count = Number(req.query.amount);
     if (isNaN(count)) count = 0;
     if (!isFinite(count)) count = 0;
+    if (count < 0) count = 0;
     if (count > 20) count = 20;
     count = Math.round(count);
     const arr = grabArray().slice(0, count);
+    const projectsList = new ProjectList(arr);
+    const returning = projectsList.toArray(false);
     res.header("Content-Type", 'application/json');
     res.status(200);
-    res.json(arr);
+    res.json(returning);
 })
 // get unapproved projects
 app.get('/api/projects/getUnapproved', async function (req, res) {
