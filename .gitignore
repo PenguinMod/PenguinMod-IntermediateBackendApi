@@ -16,6 +16,7 @@ cooldown.json
 banned.json
 users.json
 usermessages.json
+userdata.json
 
 # Extra
 blockedips.json
