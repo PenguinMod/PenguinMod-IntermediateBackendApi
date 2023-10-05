@@ -41,13 +41,12 @@ const ApproverUsernames = [
 
 const BlockedIPs = require("./blockedips.json");
 
-// TODO: this should be an ENV
-const DEBUG_logAllFailedData = false;
-
 const fs = require("fs");
 const jimp = require("jimp");
 const Database = require("easy-json-database");
 const Cast = require("./classes/Cast.js");
+
+const DEBUG_logAllFailedData = Cast.toBoolean(process.env.LogFailedData);
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -181,9 +180,9 @@ app.get('/:id', async function (req, res) {
     res.status(200);
     let html = projectTemplate
     for (const prop in json) {
-        html = html.replaceAll(`{project.${prop}}`, escapeXML(json[prop]))
+        html = html.replaceAll(`{project.${prop}}`, escapeXML(json[prop]));
     }
-    res.send(html)
+    res.send(html);
 });
 
 // security stuff i guess :idk_man:
@@ -1600,7 +1599,8 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
         project[targetType].push(userValue);
     }
     console.log('updated', targetType, 'on', project.id, 'to', project[targetType].length);
-    if ((targetType === 'votes') && (project.votes.length >= 6)) {
+    const featuredVotes = Cast.toNumber(process.env.VotesRequiredForFeature);
+    if ((targetType === 'votes') && (project.votes.length >= featuredVotes)) {
         // people lik this project
         let wasFeatured = project.featured;
         project.featured = true;
@@ -1856,8 +1856,7 @@ app.post('/api/projects/update', async function (req, res) {
     res.json({ "success": true });
 })
 // upload project to the main page
-// todo: shouldnt this be an env variable?
-const UploadsDisabled = false;
+const UploadsDisabled = Cast.toBoolean(process.env.UploadsDisabled);
 app.post('/api/projects/publish', async function (req, res) {
     const packet = req.body;
     if (UploadsDisabled && (!AdminAccountUsernames.includes(packet.author))) {
