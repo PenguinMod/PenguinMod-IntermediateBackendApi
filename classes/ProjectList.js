@@ -1,3 +1,5 @@
+const UserManager = require("./UserManager");
+
 class ProjectList {
     constructor(projects = [], paginated = true, extraDetails = {}) {
         this.projects = projects;
@@ -23,6 +25,12 @@ class ProjectList {
                 delete clone.notes;
                 delete clone.loves;
                 delete clone.votes;
+                if (clone.owner) {
+                    const badges = UserManager.getProperty(clone.owner, "badges");
+                    if (badges) {
+                        clone.fromDonator = badges.includes("donator");
+                    }
+                }
                 return clone;
             }),
             paginated: this.paginated,
