@@ -929,7 +929,7 @@ app.get('/api/users/getMyFeed', async function (req, res) {
     }
     const feed = UserManager.getUserFeed(packet.username);
     const messageList = new GenericList(feed);
-    const returning = messageList.toJSON(true, Cast.toNumber(req.query.page));
+    const returning = messageList.toJSON(true, Cast.toNumber(req.query.page ?? 0));
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json(returning);
