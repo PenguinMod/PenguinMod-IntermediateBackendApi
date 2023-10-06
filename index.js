@@ -86,13 +86,11 @@ function DecryptArray(array) {
     return na;
 }
 function SafeJSONParse(json) {
-    let canparse = true;
     try {
-        JSON.parse(json);
+        return JSON.parse(json);
     } catch {
-        canparse = false;
+        return {};
     }
-    return canparse ? JSON.parse(json) : {};
 }
 
 function Deprecation(res, reason = "") {
