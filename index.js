@@ -86,13 +86,11 @@ function DecryptArray(array) {
     return na;
 }
 function SafeJSONParse(json) {
-    let canparse = true;
     try {
-        JSON.parse(json);
+        return JSON.parse(json);
     } catch {
-        canparse = false;
+        return {};
     }
-    return canparse ? JSON.parse(json) : {};
 }
 
 function Deprecation(res, reason = "") {
@@ -136,9 +134,8 @@ app.use(bodyParser.urlencoded({
 }));
 app.use(bodyParser.json({ limit: process.env.ServerSize }));
 app.use((req, res, next) => {
-    let clientIP = req.ip;
-    if (BlockedIPs.includes(clientIP)) return res.sendStatus(403);
-    console.log(`${clientIP}: ${req.originalUrl}`);
+    if (BlockedIPs.includes(req.ip)) return res.sendStatus(403);
+    console.log(`${req.ip}: ${req.originalUrl}`);
     next();
 });
 app.set('trust proxy', 1);
