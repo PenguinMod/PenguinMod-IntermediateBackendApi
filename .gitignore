@@ -17,6 +17,9 @@ banned.json
 users.json
 usermessages.json
 userdata.json
+userfeed.json
+following.json
+hadfollowing.json
 
 # Extra
 blockedips.json

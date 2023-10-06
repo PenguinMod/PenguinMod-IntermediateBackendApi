@@ -194,6 +194,85 @@ class UserManager {
             [property]: value
         });
     }
+
+    static getFollowers(username) {
+        const db = new Database(`./following.json`);
+        const followerList = db.get(username);
+        if (!followerList) {
+            return [];
+        }
+        if (!Array.isArray(followerList)) {
+            return [];
+        }
+        return followerList;
+    }
+    static setFollowers(username, newArray) {
+        const db = new Database(`./following.json`);
+        if (!Array.isArray(newArray)) {
+            console.error("Cannot set", username, "followers to non array");
+            return;
+        }
+        db.set(username, newArray);
+    }
+    static getHadFollowers(username) {
+        const db = new Database(`./hadfollowing.json`);
+        return (db.get(username) ?? []);
+    }
+    static setHadFollower(username, follower) {
+        const db = new Database(`./hadfollowing.json`);
+        const followerList = db.get(username) ?? [];
+        if (!followerList.includes(follower)) {
+            followerList.push(follower);
+            db.set(username, followerList);
+        }
+    }
+    static addFollower(username, follower) {
+        const followers = UserManager.getFollowers(username);
+        if (followers.includes(follower)) return;
+        followers.push(follower);
+        UserManager.setFollowers(username, followers);
+        UserManager.setHadFollower(username, follower);
+    }
+    static removeFollower(username, follower) {
+        const followers = UserManager.getFollowers(username);
+        if (!followers.includes(follower)) return;
+        const idx = followers.indexOf(follower);
+        if (idx === -1) return;
+        followers.splice(idx, 1);
+        UserManager.setFollowers(username, followers);
+    }
+    static notifyFollowers(username, feedMessage) {
+        const followers = UserManager.getFollowers(username);
+        for (const follower of followers) {
+            UserManager.addToUserFeed(follower, feedMessage);
+        }
+    }
+
+    static getUserFeed(username) {
+        const db = new Database(`./userfeed.json`);
+        const userfeed = db.get(username);
+        if (!Array.isArray(userfeed)) {
+            return [];
+        }
+        return userfeed;
+    }
+    static setUserFeed(username, data) {
+        const db = new Database(`./userfeed.json`);
+        if (!Array.isArray(data)) {
+            console.error("Cannot set", username, "feed to non-array");
+            return;
+        }
+        db.set(username, data);
+    }
+    static addToUserFeed(username, message) {
+        const feed = UserManager.getUserFeed(username);
+        feed.unshift(message);
+        // feed is not meant to be an infinite log
+        if (feed.length > 50) {
+            feed.splice(49, feed.length - 50);
+        }
+        UserManager.setUserFeed(username, feed);
+    }
 }
 
 module.exports = UserManager;

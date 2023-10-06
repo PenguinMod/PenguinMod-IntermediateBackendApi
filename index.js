@@ -790,6 +790,151 @@ app.post('/api/users/setBadges', async function (req, res) {
     });
 });
 
+// following
+app.get('/api/users/getFollowerCount', async function (req, res) {
+    const packet = req.query;
+    if (typeof packet.username !== "string") {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "UsernameMustBeString" });
+        return;
+    }
+    if (!packet.username) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "UsernameNotSpecified" });
+        return;
+    }
+    const followers = UserManager.getFollowers(packet.username);
+    if (!Array.isArray(followers)) {
+        res.status(200);
+        res.header("Content-Type", 'text/plain');
+        res.send("0");
+        return;
+    }
+    res.status(200);
+    res.header("Content-Type", 'text/plain');
+    res.send(Cast.toString(followers.length));
+});
+app.get('/api/users/isFollowing', async function (req, res) {
+    const packet = req.query;
+    if (typeof packet.username !== "string") {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "UsernameMustBeString" });
+        return;
+    }
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (!packet.target) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "TargetNotSpecified" });
+        return;
+    }
+    const followers = UserManager.getFollowers(packet.target);
+    if (!Array.isArray(followers)) {
+        res.status(200);
+        res.header("Content-Type", 'application/json');
+        res.json({
+            following: false,
+            count: 0
+        });
+        return;
+    }
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({
+        following: followers.includes(packet.username),
+        count: followers.length
+    });
+});
+app.post('/api/users/followToggle', async function (req, res) {
+    const packet = req.body;
+    if (typeof packet.username !== "string") {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "UsernameMustBeString" });
+        return;
+    }
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (!packet.target) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "TargetNotSpecified" });
+        return;
+    }
+    const followers = UserManager.getFollowers(packet.target) ?? [];
+    let isNowFollowing = true;
+    if (followers.includes(packet.username)) {
+        isNowFollowing = false;
+        UserManager.removeFollower(packet.target, packet.username);
+    } else {
+        UserManager.addFollower(packet.target, packet.username);
+    }
+    if (isNowFollowing && !UserManager.getHadFollowers(packet.target).includes(packet.username)) {
+        UserManager.addMessage(packet.target, {
+            type: "followerAdded",
+            name: `${packet.username}`
+        });
+        UserManager.addToUserFeed(packet.target, {
+            type: "follow",
+            username: packet.username
+        });
+    }
+    // check if we can get followers badge
+    if (UserManager.getFollowers(packet.target).length >= 50) {
+        const badge = "followers";
+        const newBadges = UserManager.getProperty(packet.target, "badges");
+        if (!newBadges.includes(badge)) {
+            newBadges.push(badge);
+            UserManager.setProperty(packet.target, "badges", newBadges);
+            UserManager.addMessage(packet.target, {
+                type: "newBadge",
+                name: badge
+            });
+        }
+    }
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({
+        following: isNowFollowing,
+        count: (UserManager.getFollowers(packet.target) ?? []).length
+    });
+});
+
+// FEED
+app.get('/api/users/getMyFeed', async function (req, res) {
+    const packet = req.query;
+    if (typeof packet.username !== "string") {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "UsernameMustBeString" });
+        return;
+    }
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    const feed = UserManager.getUserFeed(packet.username);
+    const messageList = new GenericList(feed);
+    const returning = messageList.toJSON(true, Cast.toNumber(req.query.page));
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json(returning);
+});
+
 // banning
 app.post('/api/users/ban', async function (req, res) {
     const packet = req.body;
@@ -1139,6 +1284,14 @@ app.get('/api/projects/approve', async function (req, res) {
     if (Cast.toBoolean(project.remix)) isRemix = true;
     db.set(String(idToSetTo), project);
 
+    UserManager.notifyFollowers(project.owner, {
+        type: "upload",
+        username: project.owner,
+        content: {
+            id: project.id,
+            name: project.name
+        }
+    });
     if (isRemix) {
         if (db.has(String(project.remix))) {
             const remixedProject = db.get(String(project.remix));
@@ -1148,6 +1301,14 @@ app.get('/api/projects/approve', async function (req, res) {
                 name: `${remixedProject.name}`, // included for less API calls
                 remixId: project.id,
                 remixName: project.name,
+            });
+            UserManager.addToUserFeed(remixedProject.owner, {
+                type: "remixed",
+                username: remixedProject.owner,
+                content: {
+                    id: remixedProject.id,
+                    name: remixedProject.name
+                }
             });
         }
     }
@@ -1600,6 +1761,21 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
     }
     console.log('updated', targetType, 'on', project.id, 'to', project[targetType].length);
     const featuredVotes = Cast.toNumber(process.env.VotesRequiredForFeature);
+    if (project[targetType].length > 50) {
+        let badge = "likes";
+        if (targetType === 'votes') {
+            badge = "votes";
+        }
+        const newBadges = UserManager.getProperty(project.owner, "badges");
+        if (!newBadges.includes(badge)) {
+            newBadges.push(badge);
+            UserManager.setProperty(project.owner, "badges", newBadges);
+            UserManager.addMessage(project.owner, {
+                type: "newBadge",
+                name: badge
+            });
+        }
+    }
     if ((targetType === 'votes') && (project.votes.length >= featuredVotes)) {
         // people lik this project
         let wasFeatured = project.featured;
@@ -1609,6 +1785,15 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
                 type: "featured",
                 projectId: project.id,
                 name: `${project.name}` // included for less API calls
+            });
+        }
+        const newBadges = UserManager.getProperty(project.owner, "badges");
+        if (!newBadges.includes("featured")) {
+            newBadges.push("featured");
+            UserManager.setProperty(project.owner, "badges", newBadges);
+            UserManager.addMessage(project.owner, {
+                type: "newBadge",
+                name: "featured"
             });
         }
         if (project.featureWebhookSent !== true) {
@@ -2035,7 +2220,7 @@ app.post('/api/projects/publish', async function (req, res) {
 
     // create project id
     db = new Database(`${__dirname}/projects/published.json`);
-    let _id = Math.round(100000 + (Math.random() * 99999999));
+    let _id = Math.round(100000 + (Math.random() * 9999999999999));
     if (db.has(String(_id))) {
         while (db.has(String(_id))) _id++;
     }
