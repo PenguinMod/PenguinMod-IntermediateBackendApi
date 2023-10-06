@@ -894,7 +894,7 @@ app.post('/api/users/followToggle', async function (req, res) {
     // check if we can get followers badge
     if (UserManager.getFollowers(packet.target).length >= 50) {
         const badge = "followers";
-        const newBadges = UserManager.getProperty(packet.target, "badges");
+        const newBadges = UserManager.getProperty(packet.target, "badges") ?? [];
         if (!newBadges.includes(badge)) {
             newBadges.push(badge);
             UserManager.setProperty(packet.target, "badges", newBadges);
@@ -1766,7 +1766,7 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
         if (targetType === 'votes') {
             badge = "votes";
         }
-        const newBadges = UserManager.getProperty(project.owner, "badges");
+        const newBadges = UserManager.getProperty(project.owner, "badges") ?? [];
         if (!newBadges.includes(badge)) {
             newBadges.push(badge);
             UserManager.setProperty(project.owner, "badges", newBadges);
@@ -1787,7 +1787,7 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
                 name: `${project.name}` // included for less API calls
             });
         }
-        const newBadges = UserManager.getProperty(project.owner, "badges");
+        const newBadges = UserManager.getProperty(project.owner, "badges") ?? [];
         if (!newBadges.includes("featured")) {
             newBadges.push("featured");
             UserManager.setProperty(project.owner, "badges", newBadges);
