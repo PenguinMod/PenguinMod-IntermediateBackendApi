@@ -11,6 +11,7 @@ const AdminAccountUsernames = [
     "hacker_anonimo",
     "ianyourgod",
     "yeeter2001",
+    "JoshAtticus",
 
     // "debug",
 
