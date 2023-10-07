@@ -1497,6 +1497,7 @@ app.get('/api/projects/downloadRejected', async function (req, res) {
         !AdminAccountUsernames.includes(packet.approver)
         && !ApproverUsernames.includes(packet.approver)
     ) {
+        // TODO: allow project owner to download
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -1979,9 +1980,11 @@ app.post('/api/projects/update', async function (req, res) {
     const projectBufferData = packet.project;
     if (Cast.isString(projectBufferData)) {
         const buffer = Cast.dataURLToBuffer(projectBufferData);
-        fs.writeFile(`./projects/uploaded/p${id}.pmp`, buffer, (err) => {
-            if (err) console.error(err);
-        });
+        if (buffer) {
+            fs.writeFile(`./projects/uploaded/p${id}.pmp`, buffer, (err) => {
+                if (err) console.error(err);
+            });
+        }
         project.accepted = false;
         project.featured = false;
         project.updating = true;
@@ -1990,9 +1993,11 @@ app.post('/api/projects/update', async function (req, res) {
     const projectbufferImage = packet.image;
     if (Cast.isString(projectbufferImage)) {
         const buffer = Cast.dataURLToBuffer(projectbufferImage);
-        fs.writeFile(`./projects/uploadedImages/p${id}.png`, buffer, (err) => {
-            if (err) console.error(err);
-        });
+        if (buffer) {
+            fs.writeFile(`./projects/uploadedImages/p${id}.png`, buffer, (err) => {
+                if (err) console.error(err);
+            });
+        }
         project.accepted = false;
         project.featured = false;
         project.updating = true;
@@ -2224,13 +2229,17 @@ app.post('/api/projects/publish', async function (req, res) {
     const id = _id;
 
     const project = Cast.dataURLToBuffer(packet.project);
-    fs.writeFile(`./projects/uploaded/p${id}.pmp`, project, (err) => {
-        if (err) console.error(err);
-    })
+    if (project) {
+        fs.writeFile(`./projects/uploaded/p${id}.pmp`, project, (err) => {
+            if (err) console.error(err);
+        })
+    }
     const image = Cast.dataURLToBuffer(packet.image);
-    fs.writeFile(`./projects/uploadedImages/p${id}.png`, image, (err) => {
-        if (err) console.error(err);
-    });
+    if (image) {
+        fs.writeFile(`./projects/uploadedImages/p${id}.png`, image, (err) => {
+            if (err) console.error(err);
+        });
+    }
 
     // save in DB
     db.set(String(id), {
