@@ -12,6 +12,7 @@ const AdminAccountUsernames = [
     "ianyourgod",
     "yeeter2001",
     "JoshAtticus",
+    "ZackFavors2",
 
     // "debug",
 
