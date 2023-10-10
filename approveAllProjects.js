@@ -56,36 +56,6 @@ function approveProject(id) {
             });
         }
     }
-    {
-        // post log
-        const projectImage = String(`https://projects.penguinmod.site/api/pmWrapper/iconUrl?id=${project.id}&rn=${Math.round(Math.random() * 9999999)}`);
-        const body = JSON.stringify({
-            content: `"${project.name}" was approved by Admins`,
-            embeds: [{
-                title: `${project.name} was approved`,
-                color: 0x00ff00,
-                image: { url: projectImage },
-                url: "https://studio.penguinmod.site/#" + project.id,
-                fields: [
-                    {
-                        name: "Approved by",
-                        value: `Admins`
-                    }
-                ],
-                author: {
-                    name: String(project.owner).substring(0, 50),
-                    icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(project.owner).substring(0, 50)),
-                    url: String("https://penguinmod.site/profile?user=" + String(project.owner).substring(0, 50))
-                },
-                timestamp: new Date().toISOString()
-            }]
-        });
-        fetch(process.env.ApproverLogWebhook, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(JSON.parse(body))
-        });
-    }
 }
 
 function approveAllProjects() {
@@ -95,4 +65,14 @@ function approveAllProjects() {
         if (project.accepted) continue;
         approveProject(project.id);
     }
+
+    // send log webhook
+    const body = JSON.stringify({
+        content: `All projects were approved by Admins`
+    });
+    fetch(process.env.ApproverLogWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(JSON.parse(body))
+    });
 }
