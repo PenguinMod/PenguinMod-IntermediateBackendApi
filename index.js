@@ -1,44 +1,8 @@
 // return;
 require('dotenv').config();
 
-// todo: move to external file?
-const AdminAccountUsernames = [
-    "JeremyGamer13",
-    "JGamerTesting",
-    "jwklongYT",
-    "RedMan13",
-    "know0your0true0color",
-    "hacker_anonimo",
-    "ianyourgod",
-    "yeeter2001",
-    "JoshAtticus",
-
-    // "debug",
-
-    // add your scratch username here and you
-    // will be able to use the admin panel
-];
-
-// todo: move to external file and/or add endpoint/method to add users
-const ApproverUsernames = [
-    "JGamerFunkin",
-    "G1nX",
-    "birdman2354",
-    "infintyrussia",
-    "Disheveled_cat",
-    "poprockdev",
-    "CMC_corp",
-
-    "insanetaco2000",
-    "puzzlingGGG",
-    "ItzzEndr",
-    "TheShovel",
-    "Dicuorooja",
-    "something_nice",
-    "booger444",
-    // add scratch usernames here and they
-    // will be able to approve uploaded projects
-];
+const AdminAccountUsernames = require("./admins.json"); // add your username to this file to get admin perms
+const ApproverUsernames = require("./approvers.json"); // add your username to this file to get approver perms
 
 const BlockedIPs = require("./blockedips.json");
 
