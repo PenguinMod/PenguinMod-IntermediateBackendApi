@@ -1,15 +1,13 @@
 const Database = require("easy-json-database");
 const UserManager = require("./classes/UserManager.js");
-UserManager.load();
+const Cast = require("./classes/Cast.js");
 
 function approveProject(id) {
-    
     // this was copied and edited from the approving end point
-
     const db = new Database(`${__dirname}/projects/published.json`);
-    if (!db.has(packet.id)) {
+    if (!db.has(id)) {
         // not found
-        return;
+        return false;
     }
 
     // newMeta
@@ -17,7 +15,7 @@ function approveProject(id) {
     let isUpdated = false;
     let isRemix = false;
 
-    let idToSetTo = id
+    let idToSetTo = id;
     // idk if db uses a reference to the object or not
     const project = JSON.parse(JSON.stringify(db.get(id)));
     if (project.updating) {
@@ -27,7 +25,6 @@ function approveProject(id) {
     project.accepted = true;
     if (Cast.toBoolean(project.remix)) isRemix = true;
     db.set(String(idToSetTo), project);
-
     UserManager.notifyFollowers(project.owner, {
         type: "upload",
         username: project.owner,
@@ -56,19 +53,34 @@ function approveProject(id) {
             });
         }
     }
+    return true;
 }
 
 function approveAllProjects() {
-    const projects = db.all().map(value => { return value.data })
+    const projects = db.all().map(value => { return value.data });
+    let approvedProjects = 0;
     for (let i = 0; i < projects.length; i++) {
         const project = projects[i];
         if (project.accepted) continue;
-        approveProject(project.id);
+        if (project.hidden) return console.log(id, 'is hidden, skipping');
+        if (approveProject(project.id)) {
+            approvedProjects++;
+        }
     }
-
-    // send log webhook
+    // post log
     const body = JSON.stringify({
-        content: `All projects were approved by Admins`
+        content: `${approvedProjects} were approved by Server`,
+        embeds: [{
+            title: `${approvedProjects} were approved`,
+            color: 0x00ff00,
+            fields: [
+                {
+                    name: "Approved by",
+                    value: 'Server'
+                }
+            ],
+            timestamp: new Date().toISOString()
+        }]
     });
     fetch(process.env.ApproverLogWebhook, {
         method: "POST",
