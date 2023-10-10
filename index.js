@@ -1,9 +1,6 @@
 // return;
 require('dotenv').config();
 
-const AdminAccountUsernames = require("./admins.json"); // add your username to this file to get admin perms
-const ApproverUsernames = require("./approvers.json"); // add your username to this file to get approver perms
-
 const BlockedIPs = require("./blockedips.json");
 
 const fs = require("fs");
@@ -30,6 +27,9 @@ UserManager.load(); // should prevent logouts
 
 const ProjectList = require("./classes/ProjectList.js");
 const GenericList = require("./classes/GenericList.js");
+
+const AdminAccountUsernames = new Database(`${__dirname}/projects/admins.json`);
+const ApproverUsernames = new Database(`${__dirname}/projects/approvers.json`);
 
 // UserManager.setCode('debug', 'your-mom');
 
@@ -159,6 +159,20 @@ app.get('/api/users/isBanned', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.json({ "banned": UserManager.isBanned(req.query.username) })
 })
+app.get('/api/users/assignPossition', async function (req, res) {
+    const packet = req.query;
+    if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    AdminAccountUsernames.set(packet.target, packet.admin)
+    ApproverUsernames.set(packet.target, packet.approver)
+    res.status(200)
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": 'AppliedStatus' })
+})
 
 app.get('/api/projects/getAll', async function (req, res) {
     Deprecation(res, "Projects have seperate endpoints for approved and unapproved");
@@ -237,8 +251,8 @@ app.get('/api/projects/getUnapproved', async function (req, res) {
         return;
     }
     if (
-        !AdminAccountUsernames.includes(packet.user)
-        && !ApproverUsernames.includes(packet.user)
+        !AdminAccountUsernames.get(packet.user)
+        && !ApproverUsernames.get(packet.user)
     ) {
         res.status(403);
         res.header("Content-Type", 'application/json');
@@ -492,22 +506,22 @@ app.get('/api/users/usernameFromCode', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.json({
         "username": username,
-        "admin": AdminAccountUsernames.includes(username),
-        "approver": ApproverUsernames.includes(username)
+        "admin": AdminAccountUsernames.get(username),
+        "approver": ApproverUsernames.get(username)
     });
 });
 // extra stuff
 app.get('/api/users/isAdmin', async function (req, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
-    res.json({ "admin": AdminAccountUsernames.includes(req.query.username) });
+    res.json({ "admin": AdminAccountUsernames.get(req.query.username) });
 });
 app.get('/api/users/isApprover', async function (req, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({
-        "approver": ApproverUsernames.includes(req.query.username)
-            || AdminAccountUsernames.includes(req.query.username)
+        "approver": ApproverUsernames.get(req.query.username)
+            || AdminAccountUsernames.get(req.query.username)
     });
 });
 app.get('/api/users/getMyProjects', async function (req, res) {
@@ -613,7 +627,7 @@ app.post('/api/users/addMessage', async function (req, res) {
     const target = packet.target;
     switch (unsafeMessage.type) {
         case 'custom':
-            if (!AdminAccountUsernames.includes(username)) return notallowed();
+            if (!AdminAccountUsernames.get(username)) return notallowed();
             if (typeof unsafeMessage.text !== "string") return invalidate();
             UserManager.addMessage(target, {
                 type: unsafeMessage.type,
@@ -717,7 +731,7 @@ app.post('/api/users/setBadges', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return;
     }
-    if (!AdminAccountUsernames.includes(packet.username)) {
+    if (!AdminAccountUsernames.get(packet.username)) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -906,7 +920,7 @@ app.post('/api/users/ban', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return;
     }
-    if (!AdminAccountUsernames.includes(packet.username)) {
+    if (!AdminAccountUsernames.get(packet.username)) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -985,7 +999,7 @@ app.post('/api/users/unban', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return;
     }
-    if (!AdminAccountUsernames.includes(packet.username)) {
+    if (!AdminAccountUsernames.get(packet.username)) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -1134,8 +1148,8 @@ app.post('/api/users/disputeRespond', async function (req, res) {
         return;
     }
     if (
-        !AdminAccountUsernames.includes(packet.approver)
-        && !ApproverUsernames.includes(packet.approver)
+        !AdminAccountUsernames.get(packet.approver)
+        && !ApproverUsernames.get(packet.approver)
     ) {
         res.status(403);
         res.header("Content-Type", 'application/json');
@@ -1214,8 +1228,8 @@ app.get('/api/projects/approve', async function (req, res) {
         return;
     }
     if (
-        !AdminAccountUsernames.includes(packet.approver)
-        && !ApproverUsernames.includes(packet.approver)
+        !AdminAccountUsernames.get(packet.approver)
+        && !ApproverUsernames.get(packet.approver)
     ) {
         res.status(403);
         res.header("Content-Type", 'application/json');
@@ -1342,8 +1356,8 @@ app.post('/api/projects/reject', async function (req, res) {
         return;
     }
     if (
-        !AdminAccountUsernames.includes(packet.approver)
-        && !ApproverUsernames.includes(packet.approver)
+        !AdminAccountUsernames.get(packet.approver)
+        && !ApproverUsernames.get(packet.approver)
     ) {
         res.status(403);
         res.header("Content-Type", 'application/json');
@@ -1458,8 +1472,8 @@ app.get('/api/projects/downloadRejected', async function (req, res) {
         return;
     }
     if (
-        !AdminAccountUsernames.includes(packet.approver)
-        && !ApproverUsernames.includes(packet.approver)
+        !AdminAccountUsernames.get(packet.approver)
+        && !ApproverUsernames.get(packet.approver)
     ) {
         // TODO: allow project owner to download
         res.status(403);
@@ -1487,7 +1501,7 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return
     }
-    if (!AdminAccountUsernames.includes(packet.approver)) {
+    if (!AdminAccountUsernames.get(packet.approver)) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -1610,7 +1624,7 @@ app.get('/api/projects/feature', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return
     }
-    if (!AdminAccountUsernames.includes(packet.approver)) {
+    if (!AdminAccountUsernames.get(packet.approver)) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -1840,7 +1854,7 @@ app.get('/api/projects/delete', async function (req, res) {
     }
     const project = db.get(String(packet.id))
     if (project.owner !== packet.approver) {
-        if (!AdminAccountUsernames.includes(packet.approver)) {
+        if (!AdminAccountUsernames.get(packet.approver)) {
             res.status(403);
             res.header("Content-Type", 'application/json');
             res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -1888,7 +1902,7 @@ app.post('/api/projects/update', async function (req, res) {
     const project = db.get(String(id));
     const projectWasApproved = project.accepted;
     if (project.owner !== packet.requestor) {
-        if (!AdminAccountUsernames.includes(packet.requestor)) {
+        if (!AdminAccountUsernames.get(packet.requestor)) {
             res.status(403);
             res.header("Content-Type", 'application/json');
             res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -2010,7 +2024,7 @@ app.post('/api/projects/update', async function (req, res) {
 const UploadsDisabled = Cast.toBoolean(process.env.UploadsDisabled);
 app.post('/api/projects/publish', async function (req, res) {
     const packet = req.body;
-    if (UploadsDisabled && (!AdminAccountUsernames.includes(packet.author))) {
+    if (UploadsDisabled && (!AdminAccountUsernames.get(packet.author))) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "PublishDisabled" });
