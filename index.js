@@ -1,7 +1,7 @@
 // return;
 require('dotenv').config();
 
-const BlockedIPs = require("./blockedips.json");
+const BlockedIPs = require("./blockedips.json"); // if you are cloning this, make sure to make this file
 
 const fs = require("fs");
 const jimp = require("jimp");
@@ -57,7 +57,7 @@ function SafeJSONParse(json) {
     }
 }
 
-function Deprecation(res, reason = "") {
+function Deprecation(res, reason = "") { // if an endpoint is deprecated, use this.
     res.status(400);
     res.header("Content-Type", 'application/json');
     res.json({
@@ -114,14 +114,14 @@ app.use(rateLimit({
     legacyHeaders: false,
 }));
 
-app.get('/', async function (_, res) {
+app.get('/', async function (_, res) { // just basic stuff. returns the home page
     res.redirect('https://penguinmod.site');
 });
-app.get('/robots.txt', async function (_, res) {
+app.get('/robots.txt', async function (_, res) { // more basic stuff!!!!! returns robots.txt
     res.sendFile(path.join(__dirname, './robots.txt'));
 });
 
-// API metadata
+// get API metadata
 app.get('/api', async function (_, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
@@ -148,7 +148,7 @@ app.get('/:id', async function (req, res) {
 });
 
 // security stuff i guess :idk_man:
-app.get('/api/users/isBanned', async function (req, res) {
+app.get('/api/users/isBanned', async function (req, res) { // check if user is banned
     if (typeof req.query.username != "string") {
         res.status(400)
         res.header("Content-Type", 'application/json');
@@ -159,7 +159,7 @@ app.get('/api/users/isBanned', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.json({ "banned": UserManager.isBanned(req.query.username) })
 })
-app.get('/api/users/assignPossition', async function (req, res) {
+app.get('/api/users/assignPossition', async function (req, res) { // give someone admin or approver (only admins can use this)
     const packet = req.query;
     if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
         res.status(400);
@@ -276,7 +276,7 @@ app.get('/api/projects/getUnapproved', async function (req, res) {
     res.json(returning);
 })
 // pm wrappers so that pm code doesnt need to be changed in a major way
-app.get('/api/pmWrapper/projects', async function (req, res) {
+app.get('/api/pmWrapper/projects', async function (req, res) { // add featured projects and normal projects together
     const db = new Database(`${__dirname}/projects/published.json`)
     // this is explained in paged api but basically just add normal projects to featured projects
     // because otherwise featured projects would come after normal projects
@@ -298,7 +298,7 @@ app.get('/api/pmWrapper/projects', async function (req, res) {
     res.status(200);
     res.json(returning);
 });
-app.get('/api/pmWrapper/remixes', async function (req, res) {
+app.get('/api/pmWrapper/remixes', async function (req, res) { // get remixes of a project
     const packet = req.query;
     if (!packet.id) {
         res.status(400);
@@ -316,7 +316,7 @@ app.get('/api/pmWrapper/remixes', async function (req, res) {
     res.status(200);
     res.json(returning);
 });
-app.get('/api/pmWrapper/iconUrl', async function (req, res) {
+app.get('/api/pmWrapper/iconUrl', async function (req, res) { // get icon url of a project
     if (!req.query.id) {
         res.status(400);
         res.json({ "error": "IdNotSpecified" });
@@ -364,7 +364,7 @@ app.get('/api/pmWrapper/iconUrl', async function (req, res) {
         });
     });
 });
-app.get('/api/pmWrapper/getProject', async function (req, res) {
+app.get('/api/pmWrapper/getProject', async function (req, res) { // get data of a(n approved) project
     if (!req.query.id) {
         res.status(400);
         res.json({ "error": "IdNotSpecified" });
@@ -381,7 +381,7 @@ app.get('/api/pmWrapper/getProject', async function (req, res) {
     res.json({ id: json.id, name: json.name, author: { id: -1, username: json.owner, } });
 });
 // scratch auth implementation
-app.get('/api/users/login', async function (req, res) {
+app.get('/api/users/login', async function (req, res) { // login with scratch
     const privateCode = Cast.toString(req.query.privateCode);
     UserManager.verifyCode(privateCode).then(response => {
         // check if it is a malicious site
@@ -411,7 +411,7 @@ app.get('/api/users/login', async function (req, res) {
         res.json({ "error": "InvalidLogin" });
     });
 });
-app.get('/api/users/loginLocal', async function (req, res) {
+app.get('/api/users/loginLocal', async function (req, res) { // login with local account (like localhost)
     const privateCode = Cast.toString(req.query.privateCode);
     UserManager.verifyCode(privateCode).then(response => {
         // check if it is a malicious site
@@ -444,7 +444,7 @@ app.get('/api/users/loginLocal', async function (req, res) {
     });
 });
 // logout
-app.get('/api/users/logout', (req, res) => {
+app.get('/api/users/logout', (req, res) => { // logout
     if (!UserManager.isCorrectCode(req.query.user, req.query.code)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
@@ -456,7 +456,7 @@ app.get('/api/users/logout', (req, res) => {
     res.header("Content-Type", 'application/json');
     res.json({ "success": "LoginIsNowInvalidated" });
 });
-app.get('/api/users/usernameFromCode', async function (req, res) {
+app.get('/api/users/usernameFromCode', async function (req, res) { // get username from private code
     const privateCode = Cast.toString(req.query.privateCode);
     const username = UserManager.usernameFromCode(privateCode);
     if (username == null) {
@@ -474,12 +474,12 @@ app.get('/api/users/usernameFromCode', async function (req, res) {
     });
 });
 // extra stuff
-app.get('/api/users/isAdmin', async function (req, res) {
+app.get('/api/users/isAdmin', async function (req, res) { // check if user is admin (by username)
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "admin": AdminAccountUsernames.get(req.query.username) });
 });
-app.get('/api/users/isApprover', async function (req, res) {
+app.get('/api/users/isApprover', async function (req, res) { // check if user is approver (by username)
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({
@@ -487,7 +487,7 @@ app.get('/api/users/isApprover', async function (req, res) {
             || AdminAccountUsernames.get(req.query.username)
     });
 });
-app.get('/api/users/getMyProjects', async function (req, res) {
+app.get('/api/users/getMyProjects', async function (req, res) { // get projects of a user (need username and private code)
     if (!UserManager.isCorrectCode(req.query.user, req.query.code)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
@@ -534,7 +534,7 @@ app.get('/api/users/getMyProjects', async function (req, res) {
 })
 
 // MESSAGES
-app.get('/api/users/getMessages', async function (req, res) {
+app.get('/api/users/getMessages', async function (req, res) { // get a users messages (you have to be the user) (by username and private code)
     const packet = req.query;
     if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
         res.status(400);
@@ -550,7 +550,7 @@ app.get('/api/users/getMessages', async function (req, res) {
     res.json(returning);
 });
 // we might not actually need this endpoint tbh
-app.post('/api/users/addMessage', async function (req, res) {
+app.post('/api/users/addMessage', async function (req, res) { // add a message to a user (you have to be the user) (by username and private code)
     const packet = req.body;
     if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
         res.status(400);
@@ -598,7 +598,7 @@ app.post('/api/users/addMessage', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
 });
-app.get('/api/users/getMessageCount', async function (req, res) {
+app.get('/api/users/getMessageCount', async function (req, res) { // get a users message count (you have to be the user) (by username and private code)
     const packet = req.query;
     if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
         res.status(400);
@@ -654,7 +654,7 @@ app.post('/api/users/markMessagesAsRead', async function (req, res) {
 });
 
 // BADGES
-app.get('/api/users/getBadges', async function (req, res) {
+app.get('/api/users/getBadges', async function (req, res) { // get a users badges (by username)
     const packet = req.query;
     if (typeof packet.username !== "string") {
         res.status(400);
@@ -679,7 +679,7 @@ app.get('/api/users/getBadges', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.json(badges);
 });
-app.post('/api/users/setBadges', async function (req, res) {
+app.post('/api/users/setBadges', async function (req, res) { // set a users badges (you must be an admin) (by username)
     const packet = req.body;
     if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
         res.status(400);
@@ -723,7 +723,7 @@ app.post('/api/users/setBadges', async function (req, res) {
 });
 
 // following
-app.get('/api/users/getFollowerCount', async function (req, res) {
+app.get('/api/users/getFollowerCount', async function (req, res) { // get a users follower count (by username)
     const packet = req.query;
     if (typeof packet.username !== "string") {
         res.status(400);
@@ -748,7 +748,7 @@ app.get('/api/users/getFollowerCount', async function (req, res) {
     res.header("Content-Type", 'text/plain');
     res.send(Cast.toString(followers.length));
 });
-app.get('/api/users/isFollowing', async function (req, res) {
+app.get('/api/users/isFollowing', async function (req, res) { // check if a user is following another user (by username)
     const packet = req.query;
     if (typeof packet.username !== "string") {
         res.status(400);
