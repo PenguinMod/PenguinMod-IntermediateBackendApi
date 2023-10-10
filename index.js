@@ -167,15 +167,17 @@ app.get('/api/users/assignPossition', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return;
     }
-    AdminAccountUsernames.set(packet.target, packet.admin)
-    ApproverUsernames.set(packet.target, packet.approver)
-    res.status(200)
+    if (!AdminAccountUsernames.get(packet.user)) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+    AdminAccountUsernames.set(packet.target, Cast.toBoolean(packet.admin));
+    ApproverUsernames.set(packet.target, Cast.toBoolean(packet.approver));
+    res.status(200);
     res.header("Content-Type", 'application/json');
-    res.json({ "success": 'AppliedStatus' })
-})
-
-app.get('/api/projects/getAll', async function (req, res) {
-    Deprecation(res, "Projects have seperate endpoints for approved and unapproved");
+    res.json({ "success": 'AppliedStatus' });
 });
 // get approved projects
 app.get('/api/projects/getApproved', async function (req, res) {
