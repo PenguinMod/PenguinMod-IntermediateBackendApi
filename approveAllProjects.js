@@ -2,9 +2,10 @@ const Database = require("easy-json-database");
 const UserManager = require("./classes/UserManager.js");
 const Cast = require("./classes/Cast.js");
 
+const db = new Database(`${__dirname}/projects/published.json`);
+
 function approveProject(id) {
     // this was copied and edited from the approving end point
-    const db = new Database(`${__dirname}/projects/published.json`);
     if (!db.has(id)) {
         // not found
         return false;
@@ -63,7 +64,7 @@ function approveAllProjects() {
         const project = projects[i];
         if (project.accepted) continue;
         if (project.hidden) return console.log(id, 'is hidden, skipping');
-        if (approveProject(project.id)) {
+        if (approveProject(Cast.toString(project.id))) {
             approvedProjects++;
         }
     }
@@ -88,3 +89,5 @@ function approveAllProjects() {
         body: JSON.stringify(JSON.parse(body))
     });
 }
+
+approveAllProjects();
