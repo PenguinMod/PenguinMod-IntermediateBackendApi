@@ -380,45 +380,6 @@ app.get('/api/pmWrapper/getProject', async function (req, res) {
     res.status(200);
     res.json({ id: json.id, name: json.name, author: { id: -1, username: json.owner, } });
 });
-// const CachedScratchUsers = {}
-// let ScratchRequestQueue = 0
-app.get('/api/pmWrapper/scratchUserImage', async function (req, res) {
-    Deprecation(res, "Use trampoline.turbowarp.org/avatars/by-username instead, this endpoint has been removed to reduce network usage.");
-    // if (!req.query.username) {
-    //     res.status(400);
-    //     res.json({ "error": "UsernameNotSpecified" });
-    //     return;
-    // }
-    // const usableName = Cast.toString(req.query.username);
-    // if (CachedScratchUsers[usableName] != null) {
-    //     const image = CachedScratchUsers[usableName];
-    //     res.status(200);
-    //     res.contentType('image/png');
-    //     res.send(image);
-    //     return;
-    // }
-    // if (ScratchRequestQueue < 0) ScratchRequestQueue = 0;
-    // ScratchRequestQueue += 400;
-    // setTimeout(() => {
-    //     ScratchRequestQueue -= 400;
-    //     fetch(`https://trampoline.turbowarp.org/avatars/by-username/${usableName}`).then(serverResponse => {
-    //         serverResponse.arrayBuffer().then(arrayBuffer => {
-    //             const buffer = Buffer.from(arrayBuffer);
-    //             CachedScratchUsers[usableName] = buffer;
-    //             res.status(200);
-    //             res.contentType('image/png');
-    //             res.send(buffer);
-    //         }).catch(err => {
-    //             res.status(500);
-    //             res.json({ error: "UnexpectedError", realerror: err });
-    //         });
-    //     }).catch(() => {
-    //         res.status(500);
-    //         res.json({ error: "FailedToAccessTrampoline" });
-    //         return;
-    //     })
-    // }, ScratchRequestQueue);
-});
 // scratch auth implementation
 app.get('/api/users/login', async function (req, res) {
     const privateCode = Cast.toString(req.query.privateCode);
@@ -571,13 +532,6 @@ app.get('/api/users/getMyProjects', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.json(returning)
 })
-// store temporary data
-app.post('/api/users/store', async function (_, res) {
-    Deprecation(res, "Unused for quite some time, no longer needs to exist");
-});
-app.get('/api/users/getstore', async function (req, res) {
-    Deprecation(res, "Unused for quite some time, no longer needs to exist");
-});
 
 // MESSAGES
 app.get('/api/users/getMessages', async function (req, res) {
@@ -2329,64 +2283,6 @@ app.get('/api/projects/getPublished', async function (req, res) {
         res.status(404);
         res.json({ "error": "NotFound" });
     }
-});
-// sorts the projects into a nice array of pages
-app.get('/api/projects/paged', async function (req, res) {
-    Deprecation(res, "Not useful if pagination requires multiple requests, use /search for filtering and /getApproved for normal list");
-    // db = new Database(`${__dirname}` + "/projects/published.json");
-    // res.header("Content-Type", 'application/json');
-    // res.status(200)
-    // const projectOwnerRequired = req.query.user
-    // const projectSearchingName = req.query.includes
-    // const featuredProjectsArray = []
-    // let array = db.all().map(obj => obj.data).sort((project, sproject) => {
-    //     return sproject.date - project.date
-    // }).filter(proj => proj.accepted == true).filter(project => {
-    //     if (projectSearchingName) {
-    //         return String(project.name).toLowerCase().includes(String(projectSearchingName).toLowerCase())
-    //     }
-    //     if (typeof projectOwnerRequired !== "string") {
-    //         return true
-    //     }
-    //     return project.owner === projectOwnerRequired
-    // }).filter(project => {
-    //     // add featured projects first but also sort them by date
-    //     // to do that we just add them to a seperate array and sort that
-    //     if (project.featured) {
-    //         featuredProjectsArray.push(project)
-    //     }
-    //     return project.featured != true
-    // })
-    // // sort featured projects
-    // featuredProjectsArray.sort((project, sproject) => {
-    //     return sproject.date - project.date
-    // })
-    // // we set the array to featuredProjectsArray.concat(array) instead of array.concat(featuredProjectsArray)
-    // // because otherwise the featured projects would be after the normal projects
-    // array = featuredProjectsArray.concat(array)
-
-    // const maxItems = req.query.length ? Number(req.query.length) : 12
-    // if (maxItems <= 0) return res.json([])
-
-    // const pagesArray = []
-    // let page = []
-
-    // for (let index = 0; index < array.length; index++) {
-    //     const item = array[index]
-    //     page.push(item)
-    //     if (index % maxItems == maxItems - 1) {
-    //         pagesArray.push(page)
-    //         page = []
-    //         continue
-    //     }
-    //     if (index >= array.length - 1 && page.length != maxItems) {
-    //         pagesArray.push(page)
-    //         page = []
-    //         continue
-    //     }
-    // }
-
-    // res.json(pagesArray)
 });
 // sorts the projects into a nice array of pages
 app.get('/api/projects/search', async function (req, res) {
