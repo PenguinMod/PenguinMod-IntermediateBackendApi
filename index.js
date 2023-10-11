@@ -28,8 +28,8 @@ UserManager.load(); // should prevent logouts
 const ProjectList = require("./classes/ProjectList.js");
 const GenericList = require("./classes/GenericList.js");
 
-const AdminAccountUsernames = new Database(`${__dirname}/projects/admins.json`);
-const ApproverUsernames = new Database(`${__dirname}/projects/approvers.json`);
+const AdminAccountUsernames = new Database(`${__dirname}/admins.json`);
+const ApproverUsernames = new Database(`${__dirname}/approvers.json`);
 
 // UserManager.setCode('debug', 'your-mom');
 
