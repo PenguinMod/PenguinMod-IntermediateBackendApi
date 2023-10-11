@@ -100,6 +100,26 @@ class UserManager {
         }
         return messages.filter(message => !message.read);
     }
+    static getReports(username) {
+        const db = new Database(`./userreports.json`);
+        const reports = db.get(username);
+        if (!reports) {
+            return [];
+        }
+        return reports
+    }
+    static addReport(username, report) {
+        const db = new Database(`./userreports.json`);
+        const reports = db.get(username);
+        if (!reports) {
+            db.set(username, [
+                report
+            ]);
+            return;
+        }
+        reports.unshift(report);
+        db.set(username, reports);
+    }
     static addMessage(username, message) {
         const db = new Database(`./usermessages.json`);
         const messages = db.get(username);
