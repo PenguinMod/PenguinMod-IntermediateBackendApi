@@ -5,6 +5,7 @@ const BlockedIPs = require("./blockedips.json"); // if you are cloning this, mak
 
 const fs = require("fs");
 const jimp = require("jimp");
+const JSZip = require("jszip");
 const Database = require("easy-json-database");
 const Cast = require("./classes/Cast.js");
 
@@ -88,6 +89,45 @@ function escapeXML(unsafe) {
     });
 };
 
+/**
+ * Returns either a JSZip instance or null.
+ * @param {Buffer} buffer 
+ * @param {JSZip.JSZipLoadOptions} options 
+ * @returns {Promise<JSZip?>}
+ */
+const safeZipParse = (buffer, options) => {
+    return new Promise((resolve) => {
+        if (!buffer) return resolve();
+        JSZip.loadAsync(buffer, options).then(zip => {
+            resolve(zip);
+        }).catch(() => {
+            resolve();
+        });
+    });
+};
+
+const illegalExtensionsList = require("./illegalextensions.json");
+const checkExtensionIsAllowed = (extension, isUrl) => {
+    if (!extension) return true;
+    let propertyName = "id";
+    if (isUrl) {
+        propertyName = "url";
+    }
+    const extensionsConfig = illegalExtensionsList[propertyName];
+    const isIncluded = extensionsConfig.items.includes(extension);
+    const isBlacklist = extensionsConfig.useAsWhitelist !== true;
+    if (isBlacklist && isIncluded) {
+        return false;
+    }
+    if (!isBlacklist && isIncluded) {
+        return true;
+    }
+    if (!isBlacklist && !isIncluded) {
+        return false;
+    }
+    return true; // isBlacklist and isntIncluded
+};
+
 app.use(cors({
     origin: '*',
     optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
@@ -131,7 +171,7 @@ app.get('/api', async function (_, res) {
 app.get('/api/ping', async function (_, res) {
     res.send("Pong!")
 });
-const projectTemplate = fs.readFileSync('./project.html').toString()
+const projectTemplate = fs.readFileSync('./project.html').toString();
 app.get('/:id', async function (req, res) {
     const db = new Database(`${__dirname}/projects/published.json`);
     const json = db.get(String(req.params.id));
@@ -147,6 +187,93 @@ app.get('/:id', async function (req, res) {
     res.send(html);
 });
 
+// profile stuff
+const GenerateProfileJSON = (username) => {
+    const rawBadges = UserManager.getProperty(username, "badges");
+    const badges = Array.isArray(rawBadges) ? rawBadges : [];
+    const isDonator = badges.includes('donator');
+
+    let rank = UserManager.getProperty(username, "rank");
+    if (typeof rank !== "number") rank = 0;
+    const signInDate = UserManager.getProperty(username, "firstLogin") || Date.now();
+    const projectsDatabase = new Database(`${__dirname}/projects/published.json`);
+    const userProjects = projectsDatabase.all()
+        .map(value => { return value.data })
+        .filter(project => (project.owner === username));
+    const canRequestRankUp = (userProjects.length > 3 // if we have 3 projects and
+        && (Date.now() - signInDate) >= 4.32e+8) // first signed in 5 days ago
+        || badges.length > 0; // or we have a badge
+
+    return {
+        username,
+        admin: AdminAccountUsernames.get(username),
+        approver: ApproverUsernames.get(username),
+        banned: UserManager.isBanned(username), // skipped in /profile but provided in /usernameFromCode
+        badges,
+        donator: isDonator,
+        rank,
+        canrankup: canRequestRankUp && rank === 0,
+        viewable: userProjects.length > 0,
+        projects: userProjects.length // we check projects anyways so might aswell
+    };
+};
+app.get('/api/users/profile', async function (req, res) { // check if user is banned
+    const username = Cast.toString(req.query.username);
+    if (typeof username !== "string") {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "NoUserSpecified" });
+        return;
+    }
+    if (UserManager.isBanned(username)) {
+        res.status(404);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "NotFound" });
+        return;
+    }
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json(GenerateProfileJSON(username));
+});
+app.post('/api/users/requestRankUp', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    const username = Cast.toString(packet.username);
+    const rawBadges = UserManager.getProperty(username, "badges");
+    const badges = Array.isArray(rawBadges) ? rawBadges : [];
+
+    let rank = UserManager.getProperty(username, "rank");
+    if (typeof rank !== "number") rank = 0;
+    if (rank !== 0) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "AlreadyRankedHighest" });
+        return;
+    }
+    const signInDate = UserManager.getProperty(username, "firstLogin") || Date.now();
+    const projectsDatabase = new Database(`${__dirname}/projects/published.json`);
+    const userProjects = projectsDatabase.all()
+        .map(value => { return value.data })
+        .filter(project => (project.owner === username));
+    const canRequestRankUp = (userProjects.length > 3 // if we have 3 projects and
+        && (Date.now() - signInDate) >= 4.32e+8) // first signed in 5 days ago
+        || badges.length > 0; // or we have a badge
+    if (!canRequestRankUp) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Ineligble" });
+        return;
+    }
+    UserManager.setProperty(username, "rank", 1);
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
+});
 // security stuff i guess :idk_man:
 app.get('/api/users/isBanned', async function (req, res) { // check if user is banned
     if (typeof req.query.username != "string") {
@@ -400,7 +527,11 @@ app.get('/api/users/login', async function (req, res) { // login with scratch
             return;
         }
         // todo: we should clear the login after a couple days or so
-        UserManager.setCode(response.username, privateCode);
+        const username = response.username;
+        UserManager.setCode(username, privateCode);
+        if (!UserManager.getProperty(username, "firstLogin")) {
+            UserManager.setProperty(username, "firstLogin", Date.now());
+        }
         // close window by opening success.html
         res.header("Content-Type", 'text/html');
         res.status(200);
@@ -432,7 +563,11 @@ app.get('/api/users/loginLocal', async function (req, res) { // login with local
             return;
         }
         // todo: we should clear the login after a couple days or so
-        UserManager.setCode(response.username, privateCode);
+        const username = response.username;
+        UserManager.setCode(username, privateCode);
+        if (!UserManager.getProperty(username, "firstLogin")) {
+            UserManager.setProperty(username, "firstLogin", Date.now());
+        }
         // close window by opening success.html
         res.header("Content-Type", 'text/html');
         res.status(200);
@@ -467,11 +602,7 @@ app.get('/api/users/usernameFromCode', async function (req, res) { // get userna
     }
     res.status(200);
     res.header("Content-Type", 'application/json');
-    res.json({
-        "username": username,
-        "admin": AdminAccountUsernames.get(username),
-        "approver": ApproverUsernames.get(username)
-    });
+    res.json(GenerateProfileJSON(username));
 });
 // extra stuff
 app.get('/api/users/isAdmin', async function (req, res) { // check if user is admin (by username)
@@ -1032,8 +1163,8 @@ app.post('/api/users/report', async function (req, res) {
 
     const reportedUser = Cast.toString(packet.target);
     const reportedReason = Cast.toString(packet.reason);
-    
-    UserManager.addReport(reportedUser, {reason: reportedReason, reporter: packet.username});
+
+    UserManager.addReport(reportedUser, { reason: reportedReason, reporter: packet.username });
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
@@ -1948,7 +2079,7 @@ app.post('/api/projects/update', async function (req, res) {
         }
     }
 
-    // todo: validate project data?
+    // TODO: validate project data and check rank to see if we need to check extensions
     const projectBufferData = packet.project;
     if (Cast.isString(projectBufferData)) {
         const buffer = Cast.dataURLToBuffer(projectBufferData);
@@ -2189,6 +2320,68 @@ app.post('/api/projects/publish', async function (req, res) {
         }
     }
 
+    const project = Cast.dataURLToBuffer(packet.project);
+    if (!project) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "MissingProjectData" });
+        if (DEBUG_logAllFailedData) console.log("MissingProjectData", packet);
+        return;
+    }
+    const zip = await safeZipParse(project);
+    if (!zip) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "MissingProjectData" });
+        if (DEBUG_logAllFailedData) console.log("MissingProjectData", packet);
+        return;
+    }
+    // DEBUG
+    // fs.writeFile(`./cache/project.json`, await zip.file("project.json").async("string"), (err) => {
+    //     if (err) console.error(err);
+    // });
+    if (!zip.file("project.json")) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "MissingProjectData" });
+        if (DEBUG_logAllFailedData) console.log("MissingProjectData", packet);
+        return;
+    }
+    const rawProjectCodeJSON = await zip.file("project.json").async("string");
+    const projectCodeJSON = SafeJSONParse(rawProjectCodeJSON);
+    if (!projectCodeJSON.meta) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "MissingProjectData" });
+        if (DEBUG_logAllFailedData) console.log("MissingProjectData", packet);
+        return;
+    }
+    // ok yea project stuff exists
+    // are we a low rank?
+    const userRank = Cast.toNumber(UserManager.getProperty(packet.author, "rank"));
+    if (userRank < 1) {
+        if (projectCodeJSON.extensions) {
+            // check extensions
+            const isUrlExtension = (extId) => {
+                if (!projectCodeJSON.extensionURLs) return false;
+                return (extId in projectCodeJSON.extensionURLs);
+            };
+            for (let extension of projectCodeJSON.extensions) {
+                let isUrl = isUrlExtension(extension);
+                if (isUrl) {
+                    extension = projectCodeJSON.extensionURLs[extension];
+                }
+                if (!checkExtensionIsAllowed(extension, isUrl)) {
+                    res.status(403);
+                    res.header("Content-Type", 'application/json');
+                    res.json({ error: "CannotUseThisExtensionForThisRank", isUrl, extension });
+                    if (DEBUG_logAllFailedData) console.log("CannotUseThisExtensionForThisRank", packet);
+                    return;
+                }
+            }
+        }
+    }
+
     // set cooldown
     db.set(packet.author, Date.now() + 480000);
 
@@ -2200,12 +2393,10 @@ app.post('/api/projects/publish', async function (req, res) {
     }
     const id = _id;
 
-    const project = Cast.dataURLToBuffer(packet.project);
-    if (project) {
-        fs.writeFile(`./projects/uploaded/p${id}.pmp`, project, (err) => {
-            if (err) console.error(err);
-        })
-    }
+    // we already checked earlier if this was a valid project
+    fs.writeFile(`./projects/uploaded/p${id}.pmp`, project, (err) => {
+        if (err) console.error(err);
+    });
     const image = Cast.dataURLToBuffer(packet.image);
     if (image) {
         fs.writeFile(`./projects/uploadedImages/p${id}.png`, image, (err) => {
@@ -2236,7 +2427,7 @@ app.post('/api/projects/publish', async function (req, res) {
 
         rating: packet.rating, // E, E+10, T ratings (or ? for old projects)
         restrictions: packet.restrictions, // array of restrictions on this project (ex: blood, flashing lights)
-    })
+    });
 
     // log for approvers
     const body = JSON.stringify({

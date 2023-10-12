@@ -23,6 +23,7 @@ hadfollowing.json
 
 # Extra
 blockedips.json
+cache/*
 
 # Projects
 projects/*
