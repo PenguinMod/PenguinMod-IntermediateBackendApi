@@ -1212,6 +1212,67 @@ app.post('/api/users/disputeRespond', async function (req, res) {
     res.json({ "success": true });
 });
 
+app.get('/api/projects/report', async function (req, res) {
+    const packet = req.query;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "Reauthenticate" });
+        return;
+    }
+
+    const reportedProject = Cast.toString(packet.target);
+    const reportedReason = Cast.toString(packet.reason);
+
+    const db = new Database(`${__dirname}/projects/published.json`);
+    const project = db.get(reportedProject);
+    if (!project) {
+        res.status(404);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "NotFound" });
+        return;
+    }
+    if (!project.reports) project.reports = [];
+
+    project.reports.push({ reason: reportedReason, reporter: packet.username });
+    db.set(reportedProject, project);
+
+    res.status(200);
+    res.header("Content-Type", "application/json");
+    res.json({ success: true });
+})
+
+app.get('/api/projects/getReports', async function (req, res) {
+    const packet = req.query;
+    if (!AdminAccountUsernames.get(packet.username)
+    && !ApproverUsernames.get(packet.username)) {
+        res.status(403);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "FeatureDisabledForThisAccount" });
+        return;
+    }
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "Reauthenticate" });
+        return;
+    }
+    const projectId = Cast.toString(packet.target);
+
+    const db = new Database(`${__dirname}/projects/published.json`);
+    const project = db.get(projectId);
+    if (!project) {
+        res.status(404);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "NotFound" });
+        return;
+    }
+    if (!project.reports) project.reports = [];
+    res.status(200);
+    res.header("Content-Type", "application/json");
+    res.json(project.reports);
+})
+
 // approve uploaded projects
 app.get('/api/projects/approve', async function (req, res) {
     const packet = req.query;
