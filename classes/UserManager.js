@@ -121,10 +121,18 @@ class UserManager {
         // does this instead of .filter so if you find the element sooner you can stop searching. again, if there is
         // a better way to do this, please change it.
         reports.some(function(el, i) {
-            return test.call(e => e.reporter === username, el, i, reports) ? ((sameUser = el), true) : false;
+            return test.call(e => e.reporter === report.reporter, el, i, reports) ? ((sameUser = el), true) : false;
         });
         if (sameUser) {
             sameUser.reasons.push(report.reasons[0]);
+            if (sameUser.reasons.length > 2) {
+                this.addReport(report.reporter, {
+                    reporter: "Server",
+                    reasons: [
+                        "spam reporting"
+                    ]
+                });
+            }
             reports[reports.indexOf(sameUser)] = sameUser;
             db.set(username, reports);
             return;
