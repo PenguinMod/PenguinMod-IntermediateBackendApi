@@ -158,7 +158,7 @@ app.get('/api/users/isBanned', async function (req, res) { // check if user is b
     res.status(200)
     res.header("Content-Type", 'application/json');
     res.json({ "banned": UserManager.isBanned(req.query.username) })
-})
+});
 app.get('/api/users/assignPossition', async function (req, res) { // give someone admin or approver (only admins can use this)
     const packet = req.query;
     if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
@@ -241,7 +241,7 @@ app.get('/api/projects/max', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.status(200);
     res.json(returning);
-})
+});
 // get unapproved projects
 app.get('/api/projects/getUnapproved', async function (req, res) {
     // 6/3/2023 unapproved projects are admin only
@@ -274,7 +274,7 @@ app.get('/api/projects/getUnapproved', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.status(200);
     res.json(returning);
-})
+});
 // pm wrappers so that pm code doesnt need to be changed in a major way
 app.get('/api/pmWrapper/projects', async function (req, res) { // add featured projects and normal projects together
     const db = new Database(`${__dirname}/projects/published.json`)
@@ -1037,7 +1037,7 @@ app.post('/api/users/report', async function (req, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
-})
+});
 
 app.post('/api/users/getReports', async function (req, res) {
     const packet = req.body;
@@ -1058,7 +1058,7 @@ app.post('/api/users/getReports', async function (req, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json(reports);
-})
+});
 
 app.post('/api/users/dispute', async function (req, res) {
     const packet = req.body;
@@ -1271,7 +1271,7 @@ app.get('/api/projects/getReports', async function (req, res) {
     res.status(200);
     res.header("Content-Type", "application/json");
     res.json(project.reports);
-})
+});
 
 // approve uploaded projects
 app.get('/api/projects/approve', async function (req, res) {
@@ -1740,7 +1740,7 @@ app.get('/api/projects/feature', async function (req, res) {
         body: JSON.stringify(JSON.parse(body))
     });
     // .then(res => res.text().then(t => console.log("WebhookResponse",res.status,t))).catch(err => console.log("FailedWebhookSend", err))
-})
+});
 // toggle liking or voting for uploaded projects
 app.post('/api/projects/toggleProjectVote', async function (req, res) {
     const packet = req.body;
@@ -1856,7 +1856,7 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "state": voted });
-})
+});
 app.get('/api/projects/getProjectVote', async function (req, res) {
     const packet = req.query;
     const username = String(packet.user);
@@ -1888,7 +1888,7 @@ app.get('/api/projects/getProjectVote', async function (req, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "loved": loved, "voted": voted });
-})
+});
 // delete uploaded projects
 app.get('/api/projects/delete', async function (req, res) {
     // todo: should we make backups of these? remember, uploaded projects are NOT save files
@@ -2074,7 +2074,7 @@ app.post('/api/projects/update', async function (req, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
-})
+});
 // upload project to the main page
 const UploadsDisabled = Cast.toBoolean(process.env.UploadsDisabled);
 app.post('/api/projects/publish', async function (req, res) {
@@ -2333,7 +2333,7 @@ app.post('/api/projects/publish', async function (req, res) {
     res.status(200);
     res.json({ "published": id });
     console.log(packet.title, "was published!");
-})
+});
 // gets a published project
 const viewsIpStorage = {};
 app.get('/api/projects/getPublished', async function (req, res) {
