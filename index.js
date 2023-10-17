@@ -1033,7 +1033,7 @@ app.post('/api/users/report', async function (req, res) {
     const reportedUser = Cast.toString(packet.target);
     const reportedReason = Cast.toString(packet.reason);
 
-    UserManager.addReport(reportedUser, { reason: reportedReason, reporter: packet.username });
+    UserManager.addReport(reportedUser, { reasons: [reportedReason], reporter: packet.username });
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
