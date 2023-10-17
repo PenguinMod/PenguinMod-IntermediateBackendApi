@@ -168,7 +168,7 @@ app.get('/api/users/assignPossition', async function (req, res) { // give someon
         res.json({ "error": "Reauthenticate" });
         return;
     }
-    if (!AdminAccountUsernames.get(packet.user)) {
+    if (!AdminAccountUsernames.get(Cast.toString(packet.user))) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -254,8 +254,8 @@ app.get('/api/projects/getUnapproved', async function (req, res) {
         return;
     }
     if (
-        !AdminAccountUsernames.get(packet.user)
-        && !ApproverUsernames.get(packet.user)
+        !AdminAccountUsernames.get(Cast.toString(packet.user))
+        && !ApproverUsernames.get(Cast.toString(packet.user))
     ) {
         res.status(403);
         res.header("Content-Type", 'application/json');
@@ -470,22 +470,22 @@ app.get('/api/users/usernameFromCode', async function (req, res) { // get userna
     res.header("Content-Type", 'application/json');
     res.json({
         "username": username,
-        "admin": AdminAccountUsernames.get(username),
-        "approver": ApproverUsernames.get(username)
+        "admin": AdminAccountUsernames.get(Cast.toString(username)),
+        "approver": ApproverUsernames.get(Cast.toString(username))
     });
 });
 // extra stuff
 app.get('/api/users/isAdmin', async function (req, res) { // check if user is admin (by username)
     res.status(200);
     res.header("Content-Type", 'application/json');
-    res.json({ "admin": AdminAccountUsernames.get(req.query.username) });
+    res.json({ "admin": AdminAccountUsernames.get(Cast.toString(req.query.username)) });
 });
 app.get('/api/users/isApprover', async function (req, res) { // check if user is approver (by username)
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({
-        "approver": ApproverUsernames.get(req.query.username)
-            || AdminAccountUsernames.get(req.query.username)
+        "approver": ApproverUsernames.get(Cast.toString(req.query.username))
+            || AdminAccountUsernames.get(Cast.toString(req.query.username))
     });
 });
 app.get('/api/users/getMyProjects', async function (req, res) { // get projects of a user (need username and private code)
@@ -580,7 +580,7 @@ app.post('/api/users/addMessage', async function (req, res) { // add a message t
     if (typeof unsafeMessage.type !== "string") return invalidate();
 
     // check message type & add it
-    const username = packet.username;
+    const username = Cast.toString(packet.username);
     const target = packet.target;
     switch (unsafeMessage.type) {
         case 'custom':
@@ -601,13 +601,13 @@ app.post('/api/users/addMessage', async function (req, res) { // add a message t
 });
 app.get('/api/users/getMessageCount', async function (req, res) { // get a users message count (you have to be the user) (by username and private code)
     const packet = req.query;
-    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+    if (!UserManager.isCorrectCode(Cast.toString(packet.username), packet.passcode)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "Reauthenticate" });
         return;
     }
-    const messages = UserManager.getUnreadMessages(packet.username);
+    const messages = UserManager.getUnreadMessages(Cast.toString(packet.username));
     res.status(200);
     res.header("Content-Type", 'text/plain');
     res.send(String(messages.length));
@@ -682,13 +682,13 @@ app.get('/api/users/getBadges', async function (req, res) { // get a users badge
 });
 app.post('/api/users/setBadges', async function (req, res) { // set a users badges (you must be an admin) (by username)
     const packet = req.body;
-    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+    if (!UserManager.isCorrectCode(Cast.toString(packet.username), packet.passcode)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "Reauthenticate" });
         return;
     }
-    if (!AdminAccountUsernames.get(packet.username)) {
+    if (!AdminAccountUsernames.get(Cast.toString(packet.username))) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -877,7 +877,7 @@ app.post('/api/users/ban', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return;
     }
-    if (!AdminAccountUsernames.get(packet.username)) {
+    if (!AdminAccountUsernames.get(Cast.toString(packet.username))) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -956,7 +956,7 @@ app.post('/api/users/unban', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return;
     }
-    if (!AdminAccountUsernames.get(packet.username)) {
+    if (!AdminAccountUsernames.get(Cast.toString(packet.username))) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -1037,7 +1037,7 @@ app.post('/api/users/report', async function (req, res) {
     globalOperationCounter++;
     const id = `repu-${Date.now()}-${globalOperationCounter}`;
     UserManager.addReport(reportedUser, { reasons: [reportedReason], reporter: packet.username, id });
-    
+
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
@@ -1045,7 +1045,7 @@ app.post('/api/users/report', async function (req, res) {
 
 app.post('/api/users/getReports', async function (req, res) {
     const packet = req.body;
-    if (!AdminAccountUsernames.get(packet.username)) {
+    if (!AdminAccountUsernames.get(Cast.toString(packet.username))) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ error: "FeatureDisabledForThisAccount" });
@@ -1146,8 +1146,8 @@ app.post('/api/users/disputeRespond', async function (req, res) {
         return;
     }
     if (
-        !AdminAccountUsernames.get(packet.approver)
-        && !ApproverUsernames.get(packet.approver)
+        !AdminAccountUsernames.get(Cast.toString(packet.approver))
+        && !ApproverUsernames.get(Cast.toString(packet.approver))
     ) {
         res.status(403);
         res.header("Content-Type", 'application/json');
@@ -1253,8 +1253,8 @@ app.get('/api/projects/report', async function (req, res) {
 
 app.get('/api/projects/getReports', async function (req, res) {
     const packet = req.query;
-    if (!AdminAccountUsernames.get(packet.username)
-        && !ApproverUsernames.get(packet.username)) {
+    if (!AdminAccountUsernames.get(Cast.toString(packet.username))
+        && !ApproverUsernames.get(Cast.toString(packet.username))) {
         res.status(403);
         res.header("Content-Type", "application/json");
         res.json({ error: "FeatureDisabledForThisAccount" });
@@ -1296,8 +1296,8 @@ app.get('/api/projects/approve', async function (req, res) {
         return;
     }
     if (
-        !AdminAccountUsernames.get(packet.approver)
-        && !ApproverUsernames.get(packet.approver)
+        !AdminAccountUsernames.get(Cast.toString(packet.approver))
+        && !ApproverUsernames.get(Cast.toString(packet.approver))
     ) {
         res.status(403);
         res.header("Content-Type", 'application/json');
@@ -1319,7 +1319,7 @@ app.get('/api/projects/approve', async function (req, res) {
 
     let idToSetTo = packet.id;
     // idk if db uses a reference to the object or not
-    const project = JSON.parse(JSON.stringify(db.get(packet.id)));
+    const project = JSON.parse(JSON.stringify(db.get(Cast.toString(packet.id))));
     if (project.updating) {
         isUpdated = true;
     }
@@ -1424,8 +1424,8 @@ app.post('/api/projects/reject', async function (req, res) {
         return;
     }
     if (
-        !AdminAccountUsernames.get(packet.approver)
-        && !ApproverUsernames.get(packet.approver)
+        !AdminAccountUsernames.get(Cast.toString(packet.approver))
+        && !ApproverUsernames.get(Cast.toString(packet.approver))
     ) {
         res.status(403);
         res.header("Content-Type", 'application/json');
@@ -1540,8 +1540,8 @@ app.get('/api/projects/downloadRejected', async function (req, res) {
         return;
     }
     if (
-        !AdminAccountUsernames.get(packet.approver)
-        && !ApproverUsernames.get(packet.approver)
+        !AdminAccountUsernames.get(Cast.toString(packet.approver))
+        && !ApproverUsernames.get(Cast.toString(packet.approver))
     ) {
         // TODO: allow project owner to download
         res.status(403);
@@ -1569,7 +1569,7 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return
     }
-    if (!AdminAccountUsernames.get(packet.approver)) {
+    if (!AdminAccountUsernames.get(Cast.toString(packet.approver))) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -1692,7 +1692,7 @@ app.get('/api/projects/feature', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return
     }
-    if (!AdminAccountUsernames.get(packet.approver)) {
+    if (!AdminAccountUsernames.get(Cast.toString(packet.approver))) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -1922,7 +1922,7 @@ app.get('/api/projects/delete', async function (req, res) {
     }
     const project = db.get(String(packet.id))
     if (project.owner !== packet.approver) {
-        if (!AdminAccountUsernames.get(packet.approver)) {
+        if (!AdminAccountUsernames.get(Cast.toString(packet.approver))) {
             res.status(403);
             res.header("Content-Type", 'application/json');
             res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -1970,7 +1970,7 @@ app.post('/api/projects/update', async function (req, res) {
     const project = db.get(String(id));
     const projectWasApproved = project.accepted;
     if (project.owner !== packet.requestor) {
-        if (!AdminAccountUsernames.get(packet.requestor)) {
+        if (!AdminAccountUsernames.get(Cast.toString(packet.requestor))) {
             res.status(403);
             res.header("Content-Type", 'application/json');
             res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -2092,7 +2092,7 @@ app.post('/api/projects/update', async function (req, res) {
 const UploadsDisabled = Cast.toBoolean(process.env.UploadsDisabled);
 app.post('/api/projects/publish', async function (req, res) {
     const packet = req.body;
-    if (UploadsDisabled && (!AdminAccountUsernames.get(packet.author))) {
+    if (UploadsDisabled && (!AdminAccountUsernames.get(Cast.toString(packet.author)))) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "PublishDisabled" });
@@ -2115,7 +2115,7 @@ app.post('/api/projects/publish', async function (req, res) {
 
     // cooldown check
     let db = new Database(`${__dirname}/cooldown.json`);
-    const cooldown = Number(db.get(packet.author));
+    const cooldown = Number(db.get(Cast.toString(packet.author)));
     if (Date.now() < cooldown) {
         res.status(429);
         res.header("Content-Type", 'application/json');
