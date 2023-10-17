@@ -16,4 +16,4 @@
 
 ### Ranking
 - [x] Rank users based on if they have more than 3 projects and signed in 5 days ago
-- [ ] Only ranked users should be able to use Custom Extensions, Files, iframe, HTTP, Website Requests, Network, etc.
+- [x] Only ranked users should be able to use Custom Extensions, Files, iframe, HTTP, Website Requests, Network, etc.
