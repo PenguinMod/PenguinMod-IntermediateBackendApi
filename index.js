@@ -17,6 +17,7 @@ const path = require('path');
 const rateLimit = require('express-rate-limit');
 const app = express();
 const port = 8080;
+let globalOperationCounter = 0;
 
 const { encrypt, decrypt } = require("./utilities/encrypt.js");
 
@@ -531,7 +532,7 @@ app.get('/api/users/getMyProjects', async function (req, res) { // get projects 
     res.status(200)
     res.header("Content-Type", 'application/json');
     res.json(returning)
-})
+});
 
 // MESSAGES
 app.get('/api/users/getMessages', async function (req, res) { // get a users messages (you have to be the user) (by username and private code)
@@ -1033,7 +1034,10 @@ app.post('/api/users/report', async function (req, res) {
     const reportedUser = Cast.toString(packet.target);
     const reportedReason = Cast.toString(packet.reason);
 
-    UserManager.addReport(reportedUser, { reasons: [reportedReason], reporter: packet.username });
+    globalOperationCounter++;
+    const id = `repu-${Date.now()}-${globalOperationCounter}`;
+    UserManager.addReport(reportedUser, { reasons: [reportedReason], reporter: packet.username, id });
+    
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
@@ -1232,10 +1236,15 @@ app.get('/api/projects/report', async function (req, res) {
         res.json({ error: "NotFound" });
         return;
     }
-    if (!project.reports) project.reports = [];
 
-    project.reports.push({ reason: reportedReason, reporter: packet.username });
-    db.set(reportedProject, project);
+    const reportDB = new Database(`./projectreports.json`);
+    let projectReports = reportDB.get(reportedProject);
+    if (!Array.isArray(projectReports)) projectReports = [];
+
+    globalOperationCounter++;
+    const id = `rep-${Date.now()}-${globalOperationCounter}`;
+    projectReports.push({ reason: reportedReason, reporter: packet.username, id });
+    reportDB.set(reportedProject, projectReports);
 
     res.status(200);
     res.header("Content-Type", "application/json");
@@ -1267,10 +1276,14 @@ app.get('/api/projects/getReports', async function (req, res) {
         res.json({ error: "NotFound" });
         return;
     }
-    if (!project.reports) project.reports = [];
+
+    const reportDB = new Database(`./projectreports.json`);
+    let projectReports = reportDB.get(projectId);
+    if (!Array.isArray(projectReports)) projectReports = [];
+
     res.status(200);
     res.header("Content-Type", "application/json");
-    res.json(project.reports);
+    res.json(projectReports);
 });
 
 // approve uploaded projects

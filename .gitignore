@@ -20,6 +20,7 @@ userdata.json
 userfeed.json
 following.json
 hadfollowing.json
+userreports.json
 
 # Extra
 blockedips.json
