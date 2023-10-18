@@ -28,6 +28,7 @@ UserManager.load(); // should prevent logouts
 
 const ProjectList = require("./classes/ProjectList.js");
 const GenericList = require("./classes/GenericList.js");
+const ReportList = require("./classes/ReportList.js");
 
 const AdminAccountUsernames = new Database(`${__dirname}/admins.json`);
 const ApproverUsernames = new Database(`${__dirname}/approvers.json`);
@@ -1022,8 +1023,8 @@ app.post('/api/users/unban', async function (req, res) {
     });
 });
 
-app.post('/api/users/report', async function (req, res) {
-    const packet = req.body;
+app.get('/api/users/report', async function (req, res) {
+    const packet = req.query;
     if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
@@ -1036,15 +1037,18 @@ app.post('/api/users/report', async function (req, res) {
 
     globalOperationCounter++;
     const id = `repu-${Date.now()}-${globalOperationCounter}`;
-    UserManager.addReport(reportedUser, { reasons: [reportedReason], reporter: packet.username, id });
+    UserManager.addReport(reportedUser, {
+        reason: reportedReason,
+        reporter: packet.username,
+        id
+    }, true);
 
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
 });
-
-app.post('/api/users/getReports', async function (req, res) {
-    const packet = req.body;
+app.get('/api/users/getReports', async function (req, res) {
+    const packet = req.query;
     if (!AdminAccountUsernames.get(Cast.toString(packet.username))) {
         res.status(403);
         res.header("Content-Type", 'application/json');
@@ -1058,10 +1062,11 @@ app.post('/api/users/getReports', async function (req, res) {
         return;
     }
 
-    const reports = UserManager.getReports();
+    const reports = UserManager.getReports(Cast.toString(packet.target));
+    const mergedReports = new ReportList(reports).toMerged();
     res.status(200);
     res.header("Content-Type", 'application/json');
-    res.json(reports);
+    res.json(mergedReports);
 });
 
 app.post('/api/users/dispute', async function (req, res) {
@@ -1245,6 +1250,7 @@ app.get('/api/projects/report', async function (req, res) {
     const id = `rep-${Date.now()}-${globalOperationCounter}`;
     projectReports.push({ reason: reportedReason, reporter: packet.username, id });
     reportDB.set(reportedProject, projectReports);
+    UserManager.punishSameUserReports(projectReports, packet.username, `Project ${reportedProject}`);
 
     res.status(200);
     res.header("Content-Type", "application/json");
@@ -1280,10 +1286,11 @@ app.get('/api/projects/getReports', async function (req, res) {
     const reportDB = new Database(`./projectreports.json`);
     let projectReports = reportDB.get(projectId);
     if (!Array.isArray(projectReports)) projectReports = [];
+    const mergedReports = new ReportList(projectReports).toMerged();
 
     res.status(200);
     res.header("Content-Type", "application/json");
-    res.json(projectReports);
+    res.json(mergedReports);
 });
 
 // approve uploaded projects
