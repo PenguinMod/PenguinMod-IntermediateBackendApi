@@ -1212,7 +1212,10 @@ app.get('/api/users/report', async function (req, res) {
 });
 app.get('/api/users/getReports', async function (req, res) {
     const packet = req.query;
-    if (!AdminAccountUsernames.get(Cast.toString(packet.username))) {
+    if (
+        !AdminAccountUsernames.get(Cast.toString(packet.username))
+        && !ApproverUsernames.get(Cast.toString(packet.username))
+    ) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ error: "FeatureDisabledForThisAccount" });
@@ -1230,6 +1233,29 @@ app.get('/api/users/getReports', async function (req, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json(mergedReports);
+});
+app.get('/api/users/getUsersWithReports', async function (req, res) {
+    const packet = req.query;
+    if (
+        !AdminAccountUsernames.get(Cast.toString(packet.username))
+        && !ApproverUsernames.get(Cast.toString(packet.username))
+    ) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ error: "FeatureDisabledForThisAccount" });
+        return;
+    }
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ error: "Reauthenticate" });
+        return;
+    }
+
+    const reports = UserManager.getAllReports();
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json(reports.map(r => r.key));
 });
 
 app.post('/api/users/dispute', async function (req, res) {
@@ -1483,6 +1509,29 @@ app.get('/api/projects/getReports', async function (req, res) {
     res.status(200);
     res.header("Content-Type", "application/json");
     res.json(mergedReports);
+});
+app.get('/api/projects/getProjectsWithReports', async function (req, res) {
+    const packet = req.query;
+    if (!AdminAccountUsernames.get(Cast.toString(packet.username))
+        && !ApproverUsernames.get(Cast.toString(packet.username))) {
+        res.status(403);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "FeatureDisabledForThisAccount" });
+        return;
+    }
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "Reauthenticate" });
+        return;
+    }
+
+    const reportDB = new Database(`./projectreports.json`);
+    const allReports = reportDB.all();
+
+    res.status(200);
+    res.header("Content-Type", "application/json");
+    res.json(allReports.map(r => r.key));
 });
 
 // approve uploaded projects
@@ -1742,11 +1791,23 @@ app.get('/api/projects/downloadRejected', async function (req, res) {
         !AdminAccountUsernames.get(Cast.toString(packet.approver))
         && !ApproverUsernames.get(Cast.toString(packet.approver))
     ) {
-        // TODO: allow project owner to download
-        res.status(403);
-        res.header("Content-Type", 'application/json');
-        res.json({ "error": "FeatureDisabledForThisAccount" });
-        return;
+        const allowed = await new Promise((resolve) => {
+            const backupProjectMetaPath = `./projects/backup/proj${packet.id}.json`;
+            fs.readFile(backupProjectMetaPath, 'utf8', (err, data) => {
+                if (err) {
+                    // this was rejected so long ago that we really dont care that anyone can download it
+                    return resolve(true);
+                }
+                const projectMeta = SafeJSONParse(data);
+                resolve(projectMeta.owner === packet.approver);
+            });
+        });
+        if (!allowed) {
+            res.status(403);
+            res.header("Content-Type", 'application/json');
+            res.json({ "error": "FeatureDisabledForThisAccount" });
+            return;
+        }
     }
     const projectDataPath = `./projects/backup/proj${packet.id}.pmp`;
     fs.readFile(projectDataPath, (err) => {
@@ -1768,7 +1829,10 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return
     }
-    if (!AdminAccountUsernames.get(Cast.toString(packet.approver))) {
+    if (
+        !AdminAccountUsernames.get(Cast.toString(packet.approver))
+        && !ApproverUsernames.get(Cast.toString(packet.approver))
+    ) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -1822,7 +1886,7 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
                 "notes": "This project was restored, but it's information was missing or corrupted.\nPlease edit the project to restore this information.",
                 "owner": packet.approver, // we dont know the owner
                 "featured": false,
-                "accepted": false,
+                "accepted": true,
                 "date": Date.now(),
                 "views": 0,
                 "loves": [],
@@ -1842,7 +1906,7 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
             }
             const usingData = {
                 ...projectMetadata,
-                accepted: false,
+                accepted: true,
                 featured: false
             }
             if (usingData.owner) {
@@ -1864,7 +1928,7 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
         }
         const usingData = {
             ...projectMeta,
-            accepted: false,
+            accepted: true,
             featured: false
         }
         if (usingData.owner) {
@@ -2214,23 +2278,72 @@ app.post('/api/projects/update', async function (req, res) {
         }
         // if yea then do
         if (updatingProject) {
-            project.accepted = false;
+            project.accepted = true;
             project.featured = false;
             project.updating = true;
             project.date = Date.now();
         }
     }
 
-    // TODO: validate project data and check rank to see if we need to check extensions
     const projectBufferData = packet.project;
     if (Cast.isString(projectBufferData)) {
         const buffer = Cast.dataURLToBuffer(projectBufferData);
         if (buffer) {
-            fs.writeFile(`./projects/uploaded/p${id}.pmp`, buffer, (err) => {
-                if (err) console.error(err);
-            });
+            const zip = await safeZipParse(buffer);
+            if (!zip) {
+                res.status(400);
+                res.header("Content-Type", 'application/json');
+                res.json({ "error": "MissingProjectData" });
+                if (DEBUG_logAllFailedData) console.log("MissingProjectData", packet);
+                return;
+            }
+            // DEBUG
+            // fs.writeFile(`./cache/project.json`, await zip.file("project.json").async("string"), (err) => {
+            //     if (err) console.error(err);
+            // });
+            if (!zip.file("project.json")) {
+                res.status(400);
+                res.header("Content-Type", 'application/json');
+                res.json({ "error": "MissingProjectData" });
+                if (DEBUG_logAllFailedData) console.log("MissingProjectData", packet);
+                return;
+            }
+            const rawProjectCodeJSON = await zip.file("project.json").async("string");
+            const projectCodeJSON = SafeJSONParse(rawProjectCodeJSON);
+            if (!projectCodeJSON.meta) {
+                res.status(400);
+                res.header("Content-Type", 'application/json');
+                res.json({ "error": "MissingProjectData" });
+                if (DEBUG_logAllFailedData) console.log("MissingProjectData", packet);
+                return;
+            }
+            // ok yea project stuff exists
+            // are we a low rank?
+            const userRank = Cast.toNumber(UserManager.getProperty(packet.requestor, "rank"));
+            if (userRank < 1) {
+                if (projectCodeJSON.extensions) {
+                    // check extensions
+                    const isUrlExtension = (extId) => {
+                        if (!projectCodeJSON.extensionURLs) return false;
+                        return (extId in projectCodeJSON.extensionURLs);
+                    };
+                    for (let extension of projectCodeJSON.extensions) {
+                        let isUrl = isUrlExtension(extension);
+                        if (isUrl) {
+                            extension = projectCodeJSON.extensionURLs[extension];
+                        }
+                        if (!checkExtensionIsAllowed(extension, isUrl)) {
+                            res.status(403);
+                            res.header("Content-Type", 'application/json');
+                            res.json({ error: "CannotUseThisExtensionForThisRank", isUrl, extension });
+                            if (DEBUG_logAllFailedData) console.log("CannotUseThisExtensionForThisRank", packet);
+                            return;
+                        }
+                    }
+                }
+            }
         }
-        project.accepted = false;
+        project.accepted = true;
         project.featured = false;
         project.updating = true;
         project.date = Date.now();
@@ -2243,7 +2356,7 @@ app.post('/api/projects/update', async function (req, res) {
                 if (err) console.error(err);
             });
         }
-        project.accepted = false;
+        project.accepted = true;
         project.featured = false;
         project.updating = true;
         project.date = Date.now();
@@ -2557,7 +2670,7 @@ app.post('/api/projects/publish', async function (req, res) {
         // image: packet.image, // base64 url
         // project: packet.project, // base64 url (not saved here since we save it in a file instead)
         featured: false, // if true, display it golden in pm or something idk
-        accepted: false, // must be accepted before it can appear on the public page
+        accepted: true, // NO LONGER FALSE, used to be: must be accepted before it can appear on the public page
 
         remix: packet.remix,
 

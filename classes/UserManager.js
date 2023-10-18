@@ -108,6 +108,10 @@ class UserManager {
         }
         return reports
     }
+    static getAllReports() {
+        const db = new Database(`./userreports.json`);
+        return db.all();
+    }
     static addReport(username, report, checkForTooMany) {
         const db = new Database(`./userreports.json`);
         const reports = UserManager.getReports(username);
