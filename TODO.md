@@ -5,13 +5,13 @@
 
 ### Moderation
 - [ ] Allow project assets to be moderated
-- [ ] Allow reports to be reviewed by mods
+- [x] Allow reports to be reviewed by mods
 
 ### Reporting
-- [ ] Add reporting projects and users with reasons
-- [ ] Save multiple reports from same user but don't count them
+- [x] Add reporting projects and users with reasons
+- [x] Save multiple reports from same user but don't count them
 - [ ] Add report to user if they report too much content too quickly
-- [ ] Add report to user if they report the same content more than 3 times
+- [x] Add report to user if they report the same content more than 3 times
 - [ ] Automatically add a report to projects with auto-detected content(?)
 
 ### Ranking

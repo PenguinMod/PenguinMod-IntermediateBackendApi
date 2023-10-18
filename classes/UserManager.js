@@ -103,22 +103,34 @@ class UserManager {
     static getReports(username) {
         const db = new Database(`./userreports.json`);
         const reports = db.get(username);
-        if (!reports) {
+        if (!Array.isArray(reports)) {
             return [];
         }
         return reports
     }
-    static addReport(username, report) {
+    static addReport(username, report, checkForTooMany) {
         const db = new Database(`./userreports.json`);
-        const reports = db.get(username);
-        if (!reports) {
-            db.set(username, [
-                report
-            ]);
-            return;
-        }
+        const reports = UserManager.getReports(username);
         reports.unshift(report);
         db.set(username, reports);
+        if (checkForTooMany) {
+            // if the reporter has reported more than 3 times, add a report to them
+            UserManager.punishSameUserReports(reports, report.reporter, username);
+        }
+    }
+    static punishSameUserReports(reports, reporter, originalTarget) {
+        // if the reporter has reported more than 3 times, add a report to them
+        const reportsByUser = reports.filter(r => r.reporter === reporter);
+        if (reportsByUser.length >= 3) {
+            // note originalTarget can be a string with "Project (project id)"
+            console.log(reporter, "reported", originalTarget, "too many times");
+            const id = `repu-${Date.now()}-server-${Math.random()}`;
+            UserManager.addReport(reporter, {
+                reason: `Reported ${originalTarget} ${reportsByUser.length} times with pending reports`,
+                reporter: "Projects API", // this is an invalid username, so it cant be taken
+                id
+            }, false); // dont check "Projects API" if they have too many reports given
+        }
     }
     static addMessage(username, message) {
         const db = new Database(`./usermessages.json`);
