@@ -1177,6 +1177,35 @@ app.get('/api/users/report', async function (req, res) {
         id
     }, true);
 
+    const body = JSON.stringify({
+        content: `${reportedUser} was reported by ${packet.username}`,
+        embeds: [{
+            title: `${reportedUser} was reported`,
+            color: 0xff0000,
+            fields: [
+                {
+                    name: "Reported by",
+                    value: `${packet.username}`
+                },
+                {
+                    name: "Reason",
+                    value: `${reportedReason}`
+                }
+            ],
+            author: {
+                name: String(reportedUser).substring(0, 50),
+                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(reportedUser).substring(0, 50)),
+                url: String("https://penguinmod.com/profile?user=" + String(reportedUser).substring(0, 50))
+            },
+            timestamp: new Date().toISOString()
+        }]
+    });
+    fetch(process.env.ApproverLogWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body
+    });
+
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
@@ -1385,6 +1414,35 @@ app.get('/api/projects/report', async function (req, res) {
     projectReports.push({ reason: reportedReason, reporter: packet.username, id });
     reportDB.set(reportedProject, projectReports);
     UserManager.punishSameUserReports(projectReports, packet.username, `Project ${reportedProject}`);
+
+    const body = JSON.stringify({
+        content: `Project ${reportedProject} was reported by ${packet.username}`,
+        embeds: [{
+            title: `Project ${reportedProject} was reported`,
+            color: 0xff0000,
+            fields: [
+                {
+                    name: "Reported by",
+                    value: `${packet.username}`
+                },
+                {
+                    name: "Reason",
+                    value: `${reportedReason}`
+                }
+            ],
+            author: {
+                name: String(packet.username).substring(0, 50),
+                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(packet.username).substring(0, 50)),
+                url: String("https://penguinmod.com/profile?user=" + String(packet.username).substring(0, 50))
+            },
+            timestamp: new Date().toISOString()
+        }]
+    });
+    fetch(process.env.ApproverLogWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body
+    });
 
     res.status(200);
     res.header("Content-Type", "application/json");
@@ -2191,37 +2249,37 @@ app.post('/api/projects/update', async function (req, res) {
         project.date = Date.now();
     }
     // if project is not accepted, make a log for approvers
-    if (projectWasApproved && !project.accepted) {
-        // post log
-        const body = JSON.stringify({
-            content: `"${project.name}" was updated by ${project.owner}`,
-            embeds: [{
-                title: `${project.name} was updated`,
-                color: 0x00bbff,
-                fields: [
-                    {
-                        name: "Owner",
-                        value: `${project.owner}`
-                    },
-                    {
-                        name: "ID",
-                        value: `${project.id}`
-                    }
-                ],
-                author: {
-                    name: String(project.owner).substring(0, 50),
-                    icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(project.owner).substring(0, 50)),
-                    url: String("https://penguinmod.com/profile?user=" + String(project.owner).substring(0, 50))
-                },
-                timestamp: new Date().toISOString()
-            }]
-        });
-        fetch(process.env.ApproverLogWebhook, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: body
-        });
-    }
+    // if (projectWasApproved && !project.accepted) {
+    //     // post log
+    //     const body = JSON.stringify({
+    //         content: `"${project.name}" was updated by ${project.owner}`,
+    //         embeds: [{
+    //             title: `${project.name} was updated`,
+    //             color: 0x00bbff,
+    //             fields: [
+    //                 {
+    //                     name: "Owner",
+    //                     value: `${project.owner}`
+    //                 },
+    //                 {
+    //                     name: "ID",
+    //                     value: `${project.id}`
+    //                 }
+    //             ],
+    //             author: {
+    //                 name: String(project.owner).substring(0, 50),
+    //                 icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(project.owner).substring(0, 50)),
+    //                 url: String("https://penguinmod.com/profile?user=" + String(project.owner).substring(0, 50))
+    //             },
+    //             timestamp: new Date().toISOString()
+    //         }]
+    //     });
+    //     fetch(process.env.ApproverLogWebhook, {
+    //         method: "POST",
+    //         headers: { "Content-Type": "application/json" },
+    //         body: body
+    //     });
+    // }
     // set in DB
     db.set(String(id), project);
     console.log(packet.requestor, "updated", id);
@@ -2514,34 +2572,34 @@ app.post('/api/projects/publish', async function (req, res) {
     });
 
     // log for approvers
-    const body = JSON.stringify({
-        content: `"${packet.title}" was uploaded by ${packet.author}`,
-        embeds: [{
-            title: `${packet.title} was uploaded`,
-            color: 0x00bbff,
-            fields: [
-                {
-                    name: "Owner",
-                    value: `${packet.author}`
-                },
-                {
-                    name: "ID",
-                    value: `${id}`
-                }
-            ],
-            author: {
-                name: String(packet.author).substring(0, 50),
-                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(packet.author).substring(0, 50)),
-                url: String("https://penguinmod.com/profile?user=" + String(packet.author).substring(0, 50))
-            },
-            timestamp: new Date().toISOString()
-        }]
-    });
-    fetch(process.env.ApproverLogWebhook, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: body
-    });
+    // const body = JSON.stringify({
+    //     content: `"${packet.title}" was uploaded by ${packet.author}`,
+    //     embeds: [{
+    //         title: `${packet.title} was uploaded`,
+    //         color: 0x00bbff,
+    //         fields: [
+    //             {
+    //                 name: "Owner",
+    //                 value: `${packet.author}`
+    //             },
+    //             {
+    //                 name: "ID",
+    //                 value: `${id}`
+    //             }
+    //         ],
+    //         author: {
+    //             name: String(packet.author).substring(0, 50),
+    //             icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(packet.author).substring(0, 50)),
+    //             url: String("https://penguinmod.com/profile?user=" + String(packet.author).substring(0, 50))
+    //         },
+    //         timestamp: new Date().toISOString()
+    //     }]
+    // });
+    // fetch(process.env.ApproverLogWebhook, {
+    //     method: "POST",
+    //     headers: { "Content-Type": "application/json" },
+    //     body: body
+    // });
 
     // actually say the thing!!!!!!!!!!
     res.status(200);
