@@ -1033,7 +1033,7 @@ app.get('/api/users/report', async function (req, res) {
     }
 
     const reportedUser = Cast.toString(packet.target);
-    const reportedReason = Cast.toString(packet.reason);
+    const reportedReason = Cast.toString(packet.reason).substring(0, 2048);
 
     globalOperationCounter++;
     const id = `repu-${Date.now()}-${globalOperationCounter}`;
@@ -1231,7 +1231,7 @@ app.get('/api/projects/report', async function (req, res) {
     }
 
     const reportedProject = Cast.toString(packet.target);
-    const reportedReason = Cast.toString(packet.reason);
+    const reportedReason = Cast.toString(packet.reason).substring(0, 2048);
 
     const db = new Database(`${__dirname}/projects/published.json`);
     const project = db.get(reportedProject);
