@@ -9,9 +9,9 @@
 
 ### Reporting
 - [x] Add reporting projects and users with reasons
-- [ ] Save multiple reports from same user but don't count them
+- [x] Save multiple reports from same user but don't count them
 - [ ] Add report to user if they report too much content too quickly
-- [ ] Add report to user if they report the same content more than 3 times
+- [x] Add report to user if they report the same content more than 3 times
 - [ ] Automatically add a report to projects with auto-detected content(?)
 
 ### Ranking
