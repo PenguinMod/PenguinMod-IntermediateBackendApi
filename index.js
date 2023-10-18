@@ -206,6 +206,8 @@ const GenerateProfileJSON = (username) => {
         && (Date.now() - signInDate) >= 4.32e+8) // first signed in 5 days ago
         || badges.length > 0; // or we have a badge
 
+    const followers = UserManager.getFollowers(username);
+
     return {
         username,
         admin: AdminAccountUsernames.get(username),
@@ -214,6 +216,7 @@ const GenerateProfileJSON = (username) => {
         badges,
         donator: isDonator,
         rank,
+        followers: followers.length,
         canrankup: canRequestRankUp && rank === 0,
         viewable: userProjects.length > 0,
         projects: userProjects.length // we check projects anyways so might aswell
