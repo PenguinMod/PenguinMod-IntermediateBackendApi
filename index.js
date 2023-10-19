@@ -2580,6 +2580,9 @@ app.post('/api/projects/update', async function (req, res) {
                     }
                 }
             }
+            fs.writeFile(`./projects/uploaded/p${id}.pmp`, buffer, (err) => {
+                if (err) console.error(err);
+            });
         }
         project.accepted = true;
         project.featured = false;
