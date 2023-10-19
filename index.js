@@ -1012,7 +1012,10 @@ app.post('/api/users/ban', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return;
     }
-    if (!AdminAccountUsernames.get(Cast.toString(packet.username))) {
+    if (
+        !AdminAccountUsernames.get(Cast.toString(packet.username))
+        && !ApproverUsernames.get(Cast.toString(packet.username))
+    ) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
@@ -1091,7 +1094,10 @@ app.post('/api/users/unban', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return;
     }
-    if (!AdminAccountUsernames.get(Cast.toString(packet.username))) {
+    if (
+        !AdminAccountUsernames.get(Cast.toString(packet.username))
+        && !ApproverUsernames.get(Cast.toString(packet.username))
+    ) {
         res.status(403);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "FeatureDisabledForThisAccount" });
