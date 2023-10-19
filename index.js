@@ -319,7 +319,7 @@ app.get('/api/projects/getApproved', async function (req, res) {
     const featuredProjects = [];
     const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
         return sproject.date - project.date;
-    }).filter(proj => proj.accepted == true).filter(project => {
+    }).filter(proj => proj.accepted === true).filter(project => {
         if (project.featured) {
             featuredProjects.push(project);
         }
@@ -346,7 +346,7 @@ app.get('/api/projects/max', async function (req, res) {
         const featuredProjects = [];
         const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
             return sproject.date - project.date;
-        }).filter(proj => proj.accepted == true).filter(project => {
+        }).filter(proj => proj.accepted === true).filter(project => {
             if (project.featured) {
                 featuredProjects.push(project);
             }
@@ -396,7 +396,7 @@ app.get('/api/projects/getUnapproved', async function (req, res) {
     const db = new Database(`${__dirname}/projects/published.json`)
     const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
         return sproject.date - project.date;
-    }).filter(proj => proj.accepted == false);
+    }).filter(proj => proj.accepted === false);
     let returnArray = projects;
     if (Cast.toBoolean(req.query.reverse)) {
         returnArray = structuredClone(returnArray).reverse();
@@ -417,7 +417,7 @@ app.get('/api/pmWrapper/projects', async function (req, res) { // add featured p
         return sproject.date - project.date;
     }).map(project => {
         return { id: project.id, name: project.name, author: { username: project.owner }, accepted: project.accepted, featured: project.featured };
-    }).filter(proj => proj.accepted == true).filter(project => {
+    }).filter(proj => proj.accepted === true).filter(project => {
         if (project.featured) {
             featuredProjects.push(project);
         }
@@ -441,7 +441,7 @@ app.get('/api/pmWrapper/remixes', async function (req, res) { // get remixes of 
     // we dont care about featured projects here because remixes cant be featured
     const json = db.all().map(value => { return value.data }).sort((project, sproject) => {
         return sproject.date - project.date;
-    }).filter(proj => proj.remix == packet.id).filter(proj => proj.accepted == true);
+    }).filter(proj => proj.remix == packet.id).filter(proj => proj.accepted === true);
     const projectsList = new ProjectList(json);
     const returning = projectsList.toJSON(true, Cast.toNumber(req.query.page));
     res.header("Content-Type", 'application/json');
@@ -1157,6 +1157,8 @@ app.post('/api/users/unban', async function (req, res) {
     });
 });
 
+// REPORTING
+// users
 app.get('/api/users/report', async function (req, res) {
     const packet = req.query;
     if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
@@ -1234,7 +1236,7 @@ app.get('/api/users/getReports', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.json(mergedReports);
 });
-app.get('/api/users/getUsersWithReports', async function (req, res) {
+app.get('/api/users/getContentWithReports', async function (req, res) {
     const packet = req.query;
     if (
         !AdminAccountUsernames.get(Cast.toString(packet.username))
@@ -1255,9 +1257,240 @@ app.get('/api/users/getUsersWithReports', async function (req, res) {
     const reports = UserManager.getAllReports();
     res.status(200);
     res.header("Content-Type", 'application/json');
-    res.json(reports.map(r => r.key));
+    res.json(reports
+        .sort((user, suser) => suser.data.length - user.data.length)
+        .map(r => ({
+            username: r.key,
+            reports: r.data.length
+        })));
+});
+app.post('/api/users/deleteReports', async function (req, res) {
+    const packet = req.body;
+    if (!AdminAccountUsernames.get(Cast.toString(packet.username))
+        && !ApproverUsernames.get(Cast.toString(packet.username))) {
+        res.status(403);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "FeatureDisabledForThisAccount" });
+        return;
+    }
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "Reauthenticate" });
+        return;
+    }
+    if (typeof packet.target !== "string") {
+        res.status(400);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "NoTargetSpecified" });
+        return;
+    }
+
+    const reportDB = new Database(`./userreports.json`);
+    const reportedUsername = Cast.toString(packet.id);
+    if (!reportDB.has(reportedUsername)) {
+        res.status(404);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "NoUserReportsFound" });
+        return;
+    }
+    const reports = reportDB.get(reportedUsername);
+    const newReports = reports.filter(report => report.reporter !== packet.target);
+    if (newReports.length <= 0) {
+        reportDB.delete(reportedUsername);
+    } else {
+        reportDB.set(reportedUsername, newReports);
+    }
+
+    res.status(200);
+    res.header("Content-Type", "application/json");
+    res.json({ success: true });
+});
+// projects
+app.get('/api/projects/report', async function (req, res) {
+    const packet = req.query;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "Reauthenticate" });
+        return;
+    }
+
+    const reportedProject = Cast.toString(packet.target);
+    const reportedReason = Cast.toString(packet.reason).substring(0, 2048);
+
+    const db = new Database(`${__dirname}/projects/published.json`);
+    const project = db.get(reportedProject);
+    if (!project) {
+        res.status(404);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "NotFound" });
+        return;
+    }
+
+    const reportDB = new Database(`./projectreports.json`);
+    let projectReports = reportDB.get(reportedProject);
+    if (!Array.isArray(projectReports)) projectReports = [];
+
+    globalOperationCounter++;
+    const id = `rep-${Date.now()}-${globalOperationCounter}`;
+    projectReports.push({ reason: reportedReason, reporter: packet.username, id });
+    reportDB.set(reportedProject, projectReports);
+    UserManager.punishSameUserReports(projectReports, packet.username, `Project ${reportedProject}`);
+
+    const body = JSON.stringify({
+        content: `Project ${reportedProject} was reported by ${packet.username}`,
+        embeds: [{
+            title: `Project ${reportedProject} was reported`,
+            color: 0xff0000,
+            fields: [
+                {
+                    name: "Reported by",
+                    value: `${packet.username}`
+                },
+                {
+                    name: "Reason",
+                    value: `${reportedReason}`
+                }
+            ],
+            author: {
+                name: String(packet.username).substring(0, 50),
+                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(packet.username).substring(0, 50)),
+                url: String("https://penguinmod.com/profile?user=" + String(packet.username).substring(0, 50))
+            },
+            timestamp: new Date().toISOString()
+        }]
+    });
+    fetch(process.env.ApproverLogWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body
+    });
+
+    res.status(200);
+    res.header("Content-Type", "application/json");
+    res.json({ success: true });
+});
+app.get('/api/projects/getReports', async function (req, res) {
+    const packet = req.query;
+    if (!AdminAccountUsernames.get(Cast.toString(packet.username))
+        && !ApproverUsernames.get(Cast.toString(packet.username))) {
+        res.status(403);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "FeatureDisabledForThisAccount" });
+        return;
+    }
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "Reauthenticate" });
+        return;
+    }
+    const projectId = Cast.toString(packet.target);
+
+    const db = new Database(`${__dirname}/projects/published.json`);
+    const project = db.get(projectId);
+    if (!project) {
+        res.status(404);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "NotFound" });
+        return;
+    }
+
+    const reportDB = new Database(`./projectreports.json`);
+    let projectReports = reportDB.get(projectId);
+    if (!Array.isArray(projectReports)) projectReports = [];
+    const mergedReports = new ReportList(projectReports).toMerged();
+
+    res.status(200);
+    res.header("Content-Type", "application/json");
+    res.json(mergedReports);
+});
+app.get('/api/projects/getContentWithReports', async function (req, res) {
+    const packet = req.query;
+    if (!AdminAccountUsernames.get(Cast.toString(packet.username))
+        && !ApproverUsernames.get(Cast.toString(packet.username))) {
+        res.status(403);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "FeatureDisabledForThisAccount" });
+        return;
+    }
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "Reauthenticate" });
+        return;
+    }
+
+    const reportDB = new Database(`./projectreports.json`);
+    const allReports = reportDB.all();
+    const projectDB = new Database(`${__dirname}/projects/published.json`);
+
+    const properFormattedReports = allReports
+        .sort((project, sproject) => sproject.data.length - project.data.length)
+        .map(r => ({
+            id: r.key,
+            reports: r.data.length
+        }));
+    for (const content of properFormattedReports) {
+        const project = projectDB.get(content.id);
+        if (project) {
+            content.exists = true;
+            content.author = project.owner;
+            content.name = project.name;
+        } else {
+            content.exists = false;
+        }
+    }
+
+    res.status(200);
+    res.header("Content-Type", "application/json");
+    res.json(properFormattedReports);
+});
+app.post('/api/projects/deleteReports', async function (req, res) {
+    const packet = req.body;
+    if (!AdminAccountUsernames.get(Cast.toString(packet.username))
+        && !ApproverUsernames.get(Cast.toString(packet.username))) {
+        res.status(403);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "FeatureDisabledForThisAccount" });
+        return;
+    }
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "Reauthenticate" });
+        return;
+    }
+    if (typeof packet.target !== "string") {
+        res.status(400);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "NoTargetSpecified" });
+        return;
+    }
+
+    const reportDB = new Database(`./projectreports.json`);
+    const projectId = Cast.toString(packet.id);
+    if (!reportDB.has(projectId)) {
+        res.status(404);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "NoProjectFound" });
+        return;
+    }
+    const reports = reportDB.get(projectId);
+    const newReports = reports.filter(report => report.reporter !== packet.target);
+    if (newReports.length <= 0) {
+        reportDB.delete(projectId);
+    } else {
+        reportDB.set(projectId, newReports);
+    }
+
+    res.status(200);
+    res.header("Content-Type", "application/json");
+    res.json({ success: true });
 });
 
+// DISPUTE
 app.post('/api/users/dispute', async function (req, res) {
     const packet = req.body;
     if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
@@ -1408,130 +1641,6 @@ app.post('/api/users/disputeRespond', async function (req, res) {
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
-});
-
-app.get('/api/projects/report', async function (req, res) {
-    const packet = req.query;
-    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
-        res.status(400);
-        res.header("Content-Type", "application/json");
-        res.json({ error: "Reauthenticate" });
-        return;
-    }
-
-    const reportedProject = Cast.toString(packet.target);
-    const reportedReason = Cast.toString(packet.reason).substring(0, 2048);
-
-    const db = new Database(`${__dirname}/projects/published.json`);
-    const project = db.get(reportedProject);
-    if (!project) {
-        res.status(404);
-        res.header("Content-Type", "application/json");
-        res.json({ error: "NotFound" });
-        return;
-    }
-
-    const reportDB = new Database(`./projectreports.json`);
-    let projectReports = reportDB.get(reportedProject);
-    if (!Array.isArray(projectReports)) projectReports = [];
-
-    globalOperationCounter++;
-    const id = `rep-${Date.now()}-${globalOperationCounter}`;
-    projectReports.push({ reason: reportedReason, reporter: packet.username, id });
-    reportDB.set(reportedProject, projectReports);
-    UserManager.punishSameUserReports(projectReports, packet.username, `Project ${reportedProject}`);
-
-    const body = JSON.stringify({
-        content: `Project ${reportedProject} was reported by ${packet.username}`,
-        embeds: [{
-            title: `Project ${reportedProject} was reported`,
-            color: 0xff0000,
-            fields: [
-                {
-                    name: "Reported by",
-                    value: `${packet.username}`
-                },
-                {
-                    name: "Reason",
-                    value: `${reportedReason}`
-                }
-            ],
-            author: {
-                name: String(packet.username).substring(0, 50),
-                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(packet.username).substring(0, 50)),
-                url: String("https://penguinmod.com/profile?user=" + String(packet.username).substring(0, 50))
-            },
-            timestamp: new Date().toISOString()
-        }]
-    });
-    fetch(process.env.ApproverLogWebhook, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body
-    });
-
-    res.status(200);
-    res.header("Content-Type", "application/json");
-    res.json({ success: true });
-})
-
-app.get('/api/projects/getReports', async function (req, res) {
-    const packet = req.query;
-    if (!AdminAccountUsernames.get(Cast.toString(packet.username))
-        && !ApproverUsernames.get(Cast.toString(packet.username))) {
-        res.status(403);
-        res.header("Content-Type", "application/json");
-        res.json({ error: "FeatureDisabledForThisAccount" });
-        return;
-    }
-    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
-        res.status(400);
-        res.header("Content-Type", "application/json");
-        res.json({ error: "Reauthenticate" });
-        return;
-    }
-    const projectId = Cast.toString(packet.target);
-
-    const db = new Database(`${__dirname}/projects/published.json`);
-    const project = db.get(projectId);
-    if (!project) {
-        res.status(404);
-        res.header("Content-Type", "application/json");
-        res.json({ error: "NotFound" });
-        return;
-    }
-
-    const reportDB = new Database(`./projectreports.json`);
-    let projectReports = reportDB.get(projectId);
-    if (!Array.isArray(projectReports)) projectReports = [];
-    const mergedReports = new ReportList(projectReports).toMerged();
-
-    res.status(200);
-    res.header("Content-Type", "application/json");
-    res.json(mergedReports);
-});
-app.get('/api/projects/getProjectsWithReports', async function (req, res) {
-    const packet = req.query;
-    if (!AdminAccountUsernames.get(Cast.toString(packet.username))
-        && !ApproverUsernames.get(Cast.toString(packet.username))) {
-        res.status(403);
-        res.header("Content-Type", "application/json");
-        res.json({ error: "FeatureDisabledForThisAccount" });
-        return;
-    }
-    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
-        res.status(400);
-        res.header("Content-Type", "application/json");
-        res.json({ error: "Reauthenticate" });
-        return;
-    }
-
-    const reportDB = new Database(`./projectreports.json`);
-    const allReports = reportDB.all();
-
-    res.status(200);
-    res.header("Content-Type", "application/json");
-    res.json(allReports.map(r => r.key));
 });
 
 // approve uploaded projects
@@ -1700,12 +1809,12 @@ app.post('/api/projects/reject', async function (req, res) {
         return;
     }
     const project = db.get(String(packet.id));
-    if (project.accepted) {
-        res.status(403);
-        res.header("Content-Type", 'application/json');
-        res.json({ "error": "CannotRejectApprovedProject" });
-        return;
-    }
+    // if (project.accepted) {
+    //     res.status(403);
+    //     res.header("Content-Type", 'application/json');
+    //     res.json({ "error": "CannotRejectApprovedProject" });
+    //     return;
+    // }
     // post log
     const body = JSON.stringify({
         content: `"${project.name}" was rejected by ${packet.approver}`,
@@ -1946,6 +2055,58 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.json({ "success": true });
 });
+app.post('/api/projects/deleteRejected', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.approver, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return
+    }
+    if (
+        !AdminAccountUsernames.get(Cast.toString(packet.approver))
+        // && !ApproverUsernames.get(Cast.toString(packet.approver))
+    ) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
+    // attempt to delete
+    const projectId = packet.id;
+
+    const backupProjectFilePath = `./projects/backup/proj${projectId}.pmp`;
+    const backupProjectImagePath = `./projects/backup/proj${projectId}.png`;
+    const backupProjectMetaPath = `./projects/backup/proj${projectId}.json`;
+    // PROJECT FILE
+    fs.unlink(backupProjectFilePath, (err) => {
+        if (err) {
+            console.warn('couldnt delete file for', projectId, err);
+            return;
+        }
+    });
+    // PROJECT IMAGE
+    fs.unlink(backupProjectImagePath, (err) => {
+        if (err) {
+            console.warn('couldnt delete image for', projectId, err);
+            return;
+        }
+    });
+    // PROJECT META
+    fs.unlink(backupProjectMetaPath, (err) => {
+        if (err) {
+            console.warn('couldnt delete metadata for', projectId, err);
+            return;
+        }
+    });
+
+    // valid info
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
+});
+
 // feature uploaded projects
 app.get('/api/projects/feature', async function (req, res) {
     const packet = req.query;
@@ -1977,12 +2138,12 @@ app.get('/api/projects/feature', async function (req, res) {
         res.json({ "error": "CantFeatureUnapprovedProject" });
         return;
     }
-    if (project.votes.length < 6) {
-        res.status(400);
-        res.header("Content-Type", 'application/json');
-        res.json({ "error": "CantFeatureProjectWithLessThan6Votes" });
-        return;
-    }
+    // if (project.votes.length < 6) {
+    //     res.status(400);
+    //     res.header("Content-Type", 'application/json');
+    //     res.json({ "error": "CantFeatureProjectWithLessThan6Votes" });
+    //     return;
+    // }
     project.featured = true;
     db.set(String(idToSetTo), project);
     UserManager.addMessage(project.owner, {
@@ -2781,7 +2942,7 @@ app.get('/api/projects/search', async function (req, res) {
     const featuredProjects = [];
     const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
         return sproject.date - project.date;
-    }).filter(proj => proj.accepted == true).filter(project => {
+    }).filter(proj => proj.accepted === true).filter(project => {
         if (projectSearchingName) {
             const projectName = Cast.toString(project.name).toLowerCase();
             const ownerName = Cast.toString(projectSearchingName).toLowerCase();

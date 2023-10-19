@@ -1,6 +1,17 @@
 class ReportList {
     constructor(reports) {
-        this.reports = reports;
+        if (!Array.isArray(reports)) {
+            this.reports = [];
+        }
+        /**
+         * @type {Array<object>}
+         */
+        this.reports = structuredClone(reports);
+        this.reports.sort((a, b) => {
+            if (a.reporter < b.reporter) { return -1; }
+            if (a.reporter > b.reporter) { return 1; }
+            return 0;
+        });
     }
     toMerged() {
         const newReports = [];
@@ -18,6 +29,7 @@ class ReportList {
                 }
                 // set this as the new base report
                 currentReport = report;
+                currentReport.ids = [report.id];
                 counter = 1;
                 currentReport.reason = `(Report 1)\n${currentReport.reason}`;
                 continue;
@@ -25,6 +37,7 @@ class ReportList {
             // merge this reports data with the current report
             counter++;
             currentReport.reason += `\n(Report ${counter})\n${report.reason}`;
+            currentReport.ids.push(report.id);
         }
         // add final report
         if (currentReport.valid !== false) {
