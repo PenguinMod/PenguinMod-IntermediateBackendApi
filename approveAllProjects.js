@@ -63,7 +63,7 @@ function approveAllProjects() {
     for (let i = 0; i < projects.length; i++) {
         const project = projects[i];
         if (project.accepted) continue; // skip if already accepted
-        if (project.hidden) return console.log(id, 'is hidden, skipping'); // skip if hidden
+        if (project.hidden) return console.log(project.id, 'is hidden, skipping'); // skip if hidden
         if (approveProject(Cast.toString(project.id))) { // if successfully approved add to counter
             approvedProjects++;
         }
