@@ -34,6 +34,8 @@ const ReportList = require("./classes/ReportList.js");
 const AdminAccountUsernames = new Database(`${__dirname}/admins.json`);
 const ApproverUsernames = new Database(`${__dirname}/approvers.json`);
 
+const GlobalRuntimeConfig = new Database(`${__dirname}/globalsettings.json`);
+
 // UserManager.setCode('debug', 'your-mom');
 
 function EncryptArray(array) {
@@ -59,6 +61,21 @@ function SafeJSONParse(json) {
         return {};
     }
 }
+
+const illegalWordsList = require("./illegalwords.js"); // js file that sets module.exports to an array of banned words
+const CheckForIllegalWording = (...args) => {
+    for (const argument of args) {
+        for (const illegalWord of illegalWordsList) {
+            const checking = Cast.toString(argument)
+                .toLowerCase()
+                .replace(/[ _\-!?.#/\\,'"@$%^&*\(\)]+/gmi, '');
+            if (checking.includes(illegalWord)) {
+                return true;
+            }
+        }
+    }
+    return false;
+};
 
 function Deprecation(res, reason = "") { // if an endpoint is deprecated, use this.
     res.status(400);
@@ -311,8 +328,34 @@ app.get('/api/users/assignPossition', async function (req, res) { // give someon
     res.header("Content-Type", 'application/json');
     res.json({ "success": 'AppliedStatus' });
 });
+app.get('/api/errorAllProjectRequests', async function (req, res) { // set the state of allowing or preventing all project info getting requests (only admins can use this)
+    const packet = req.query;
+    if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (!AdminAccountUsernames.get(Cast.toString(packet.user))) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+    GlobalRuntimeConfig.set("allowGetProjects", Cast.toBoolean(packet.enabled));
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": 'AppliedStatus' });
+});
 // get approved projects
 app.get('/api/projects/getApproved', async function (req, res) {
+    if (GlobalRuntimeConfig.get("allowGetProjects") === false) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
     const db = new Database(`${__dirname}/projects/published.json`);
     // this is explained in paged api but basically just add normal projects to featured projects
     // because otherwise featured projects would come after normal projects
@@ -339,6 +382,13 @@ app.get('/api/projects/getApproved', async function (req, res) {
 });
 // get approved projects but only a certain amount
 app.get('/api/projects/max', async function (req, res) {
+    if (GlobalRuntimeConfig.get("allowGetProjects") === false) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
     function grabArray() {
         const db = new Database(`${__dirname}/projects/published.json`)
         // this is explained in paged api but basically just add normal projects to featured projects
@@ -2412,6 +2462,13 @@ app.post('/api/projects/update', async function (req, res) {
         let updatingProject = false;
         if (typeof newMetadata.name === "string") {
             project.name = newMetadata.name;
+            if (CheckForIllegalWording(newMetadata.name)) {
+                res.status(400);
+                res.header("Content-Type", 'application/json');
+                res.json({ "error": "IllegalWordsUsed" });
+                if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
+                return;
+            }
             if (newMetadata.name.length < 3 || newMetadata.name.length > 50) {
                 res.status(400);
                 res.header("Content-Type", 'application/json');
@@ -2423,6 +2480,13 @@ app.post('/api/projects/update', async function (req, res) {
         }
         if (typeof newMetadata.instructions === "string") {
             project.instructions = newMetadata.instructions;
+            if (CheckForIllegalWording(newMetadata.instructions)) {
+                res.status(400);
+                res.header("Content-Type", 'application/json');
+                res.json({ "error": "IllegalWordsUsed" });
+                if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
+                return;
+            }
             if (newMetadata.instructions && (newMetadata.instructions.length > 4096)) {
                 res.status(400);
                 res.header("Content-Type", 'application/json');
@@ -2434,6 +2498,13 @@ app.post('/api/projects/update', async function (req, res) {
         }
         if (typeof newMetadata.notes === "string") {
             project.notes = newMetadata.notes;
+            if (CheckForIllegalWording(newMetadata.notes)) {
+                res.status(400);
+                res.header("Content-Type", 'application/json');
+                res.json({ "error": "IllegalWordsUsed" });
+                if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
+                return;
+            }
             if (newMetadata.notes && (newMetadata.notes.length > 4096)) {
                 res.status(400);
                 res.header("Content-Type", 'application/json');
@@ -2690,6 +2761,28 @@ app.post('/api/projects/publish', async function (req, res) {
         return;
     }
 
+    if (CheckForIllegalWording(packet.title)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "IllegalWordsUsed" });
+        if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
+        return;
+    }
+    if (packet.instructions && CheckForIllegalWording(packet.instructions)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "IllegalWordsUsed" });
+        if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
+        return;
+    }
+    if (packet.notes && CheckForIllegalWording(packet.notes)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "IllegalWordsUsed" });
+        if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
+        return;
+    }
+
     // TODO: these should probably be required at some point
     if (packet.rating) {
         switch (packet.rating) {
@@ -2889,6 +2982,13 @@ app.post('/api/projects/publish', async function (req, res) {
 // gets a published project
 const viewsIpStorage = {};
 app.get('/api/projects/getPublished', async function (req, res) {
+    if (GlobalRuntimeConfig.get("allowGetProjects") === false) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
     const requestIp = req.ip;
     if ((req.query.id) == null) {
         res.status(400);
@@ -2937,6 +3037,13 @@ app.get('/api/projects/getPublished', async function (req, res) {
 });
 // sorts the projects into a nice array of pages
 app.get('/api/projects/search', async function (req, res) {
+    if (GlobalRuntimeConfig.get("allowGetProjects") === false) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
     const db = new Database(`${__dirname}/projects/published.json`);
 
     const projectOwnerRequired = req.query.user;

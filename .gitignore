@@ -26,6 +26,8 @@ projectreports.json
 
 # Extra
 blockedips.json
+globalsettings.json
+illegalwords.js
 cache/*
 
 # Projects
