@@ -3052,17 +3052,35 @@ app.get('/api/projects/search', async function (req, res) {
     const projectOwnerRequired = req.query.user;
     const projectSearchingName = req.query.includes;
     const mustBeFeatured = req.query.featured;
+    const sortingBy = Cast.toString(req.query.sortby);
 
     // add featured projects first but also sort them by date
     // to do that we just sort all projects then add them to a seperate array
     const featuredProjects = [];
     const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
-        return sproject.date - project.date;
+        const latestValue = sproject.date - project.date;
+        if (sortingBy === 'likes') {
+            return (sproject.loves || []).length - (project.loves || []).length;
+        }
+        if (sortingBy === 'votes') {
+            return (sproject.votes || []).length - (project.votes || []).length;
+        }
+        if (sortingBy === 'views') {
+            return (sproject.views || 0) - (project.views || 0);
+        }
+        return latestValue;
     }).filter(proj => proj.accepted === true).filter(project => {
         if (projectSearchingName) {
-            const projectName = Cast.toString(project.name).toLowerCase();
-            const ownerName = Cast.toString(projectSearchingName).toLowerCase();
-            return projectName.includes(ownerName);
+            const projectName = Cast.toString(project.name).toLowerCase().trim();
+            const searchQueryName = Cast.toString(projectSearchingName).toLowerCase().trim();
+            const tagMatches = searchQueryName.match(/#[^\s]+/gmi);
+            let tagsFound = false;
+            if (tagMatches) {
+                const projectDescription = Cast.toString(project.instructions).toLowerCase().trim()
+                    + ` ${Cast.toString(project.notes).toLowerCase().trim()}`;
+                tagsFound = tagMatches.some(tag => projectDescription.includes(tag));
+            }
+            return tagsFound || projectName.includes(searchQueryName);
         }
         if (typeof projectOwnerRequired !== "string") {
             return true;
