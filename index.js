@@ -658,7 +658,7 @@ const handleLogin = (req, res, local) => {
             local ? "./success_local.html" : "./success.html"
         ));
     }).catch((err) => {
-        console.log('Login request failed fully');
+        console.log('Login request failed fully', err);
         const errorCode = generateErrorCode(false, err, false, false, null, local);
         res.status(400);
         if (expectingJSON) {
