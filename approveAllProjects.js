@@ -1,4 +1,4 @@
-const Database = require("easy-json-database");
+const Database = require("./easy-json-database");
 const UserManager = require("./classes/UserManager.js");
 const Cast = require("./classes/Cast.js");
 

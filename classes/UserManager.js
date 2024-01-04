@@ -1,4 +1,4 @@
-const Database = require("easy-json-database");
+const Database = require("../easy-json-database");
 
 const { encrypt, decrypt } = require("../utilities/encrypt.js");
 const { ParseJSON } = require("../utilities/safejsonparse.js");
@@ -135,7 +135,7 @@ class UserManager {
             }, false); // dont check "Projects API" if they have too many reports given
         }
     }
-    static addMessage(username, message) {
+    static addMessage(username, message, local) {
         const db = new Database(`./usermessages.json`);
         const messages = db.get(username);
         const newmessage = {
@@ -149,7 +149,15 @@ class UserManager {
             return;
         }
         messages.unshift(newmessage);
-        db.set(username, messages);
+        if (local) {
+            db.setLocal(username, messages);
+        } else {
+            db.set(username, messages);
+        }
+    }
+    static applyMessages() {
+        const db = new Database(`./usermessages.json`);
+        db.saveDataToFile();
     }
     static addModeratorMessage(username, message) {
         return UserManager.addMessage(username, {

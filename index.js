@@ -6,7 +6,7 @@ const BlockedIPs = require("./blockedips.json"); // if you are cloning this, mak
 const fs = require("fs");
 const jimp = require("jimp");
 const JSZip = require("jszip");
-const Database = require("easy-json-database");
+const Database = require("./easy-json-database");
 const Cast = require("./classes/Cast.js");
 
 const DEBUG_logAllFailedData = Cast.toBoolean(process.env.LogFailedData);
@@ -822,13 +822,15 @@ app.post('/api/users/addMessage', async function (req, res) { // add a message t
             if (typeof unsafeMessage.section !== "string") return invalidate();
             const db = new Database(`./userdata.json`);
             const usernames = db.all().map(item => item.key);
-            /* TODO: this is HORRIBLE. 1 GB of disk usage from this alone */
+            // use addMessage locally (see the last arg being true)
             for (const username of usernames) {
                 UserManager.addMessage(username, {
                     type: unsafeMessage.type,
                     section: unsafeMessage.section
-                });
+                }, true);
             }
+            // save local changes to the file
+            UserManager.applyMessages();
             break;
         default:
             return invalidate();
