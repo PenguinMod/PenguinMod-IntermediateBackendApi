@@ -79,10 +79,20 @@ class UserManager {
     static verifyCode(privateCode) {
         return new Promise((resolve, reject) => {
             const url = ScratchAuthURLs.verifyToken + privateCode;
-            console.log('Attempting login to ' + url);
+            console.log('Attempting to login using', url);
             fetch(url).then(res => {
-                res.json().then(resolve).catch(reject);
-            }).catch(reject);
+                console.log('Login Req was status', res.status);
+                res.json().then((json) => {
+                    console.log('Login JSON says', json);
+                    resolve(json);
+                }).catch((err) => {
+                    console.log('Login JSON Parse Failed!', err);
+                    reject(err);
+                });
+            }).catch((err) => {
+                console.log('Login Request Send Failed!', err);
+                reject(err);
+            });
         });
     }
 
