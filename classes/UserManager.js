@@ -4,7 +4,7 @@ const { encrypt, decrypt } = require("../utilities/encrypt.js");
 const { ParseJSON } = require("../utilities/safejsonparse.js");
 
 const ScratchAuthURLs = {
-    verifyToken: `https://pm-bapi.vercel.app/api/verifyToken?privateCode=`,
+    verifyToken: `https://auth-api.itinerary.eu.org/auth/verifyToken/`,
 };
 
 const generateId = () => {
@@ -78,7 +78,9 @@ class UserManager {
     }
     static verifyCode(privateCode) {
         return new Promise((resolve, reject) => {
-            fetch(ScratchAuthURLs.verifyToken + privateCode).then(res => {
+            const url = ScratchAuthURLs.verifyToken + privateCode;
+            console.log('Attempting login to ' + url);
+            fetch(url).then(res => {
                 res.json().then(resolve).catch(reject);
             }).catch(reject);
         });
