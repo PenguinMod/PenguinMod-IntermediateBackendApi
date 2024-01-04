@@ -822,6 +822,7 @@ app.post('/api/users/addMessage', async function (req, res) { // add a message t
             if (typeof unsafeMessage.section !== "string") return invalidate();
             const db = new Database(`./userdata.json`);
             const usernames = db.all().map(item => item.key);
+            /* TODO: this is HORRIBLE. 1 GB of disk usage from this alone */
             for (const username of usernames) {
                 UserManager.addMessage(username, {
                     type: unsafeMessage.type,
