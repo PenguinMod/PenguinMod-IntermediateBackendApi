@@ -155,7 +155,8 @@ app.use(bodyParser.urlencoded({
 app.use(bodyParser.json({ limit: process.env.ServerSize }));
 app.use((req, res, next) => {
     if (BlockedIPs.includes(req.ip)) return res.sendStatus(403);
-    const username = UsernameIP.get(req.ip) || 'Unknown';
+    const encodedIp = Buffer.from(Cast.toString(req.ip), 'utf8').toString('hex');
+    const username = UsernameIP.get(encodedIp) || 'Unknown';
     console.log(`${req.ip} - (${username}): ${req.originalUrl}`);
     next();
 });
@@ -649,7 +650,7 @@ const handleLogin = (req, res, local) => {
         const userIP = req.ip;
         if (userIP) {
             // easier if the IP is the key
-            UsernameIP.set(Cast.toString(userIP), username);
+            UsernameIP.set(Buffer.from(Cast.toString(userIP), 'utf8').toString('hex'), username);
         }
         // close window by opening success.html
         res.header("Content-Type", 'text/html');
