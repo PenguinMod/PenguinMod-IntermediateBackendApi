@@ -76,24 +76,14 @@ class UserManager {
         delete UserManager._states[username];
         UserManager.serialize();
     }
-    static verifyCode(privateCode) {
-        return new Promise((resolve, reject) => {
-            const url = ScratchAuthURLs.verifyToken + privateCode;
-            console.log('Attempting to login using', url);
-            fetch(url).then(res => {
-                console.log('Login Req was status', res.status);
-                res.json().then((json) => {
-                    console.log('Login JSON says', json);
-                    resolve(json);
-                }).catch((err) => {
-                    console.log('Login JSON Parse Failed!', err);
-                    reject(err);
-                });
-            }).catch((err) => {
-                console.log('Login Request Send Failed!', err);
-                reject(err);
-            });
-        });
+    static async verifyCode(privateCode) {
+        const url = ScratchAuthURLs.verifyToken + privateCode;
+        console.log('Attempting to login using', url);
+        const res = await fetch(url);
+        console.log('Login Req was status', res.status);
+        const json = await res.json();
+        console.log('Login JSON says', json);
+        return json;
     }
 
     static getMessages(username) {
