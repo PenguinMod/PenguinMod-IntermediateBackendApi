@@ -36,6 +36,8 @@ const ApproverUsernames = new Database(`${__dirname}/approvers.json`);
 
 const GlobalRuntimeConfig = new Database(`${__dirname}/globalsettings.json`);
 
+const UsernameIP = new Database(`${__dirname}/userips.json`);
+
 // UserManager.setCode('debug', 'your-mom');
 
 function EncryptArray(array) {
@@ -60,6 +62,10 @@ function SafeJSONParse(json) {
     } catch {
         return {};
     }
+}
+function RandomArrayItem(arr) {
+    const rng = Math.round(Math.random() * (arr.length - 1));
+    return arr[rng];
 }
 
 const illegalWordsList = require("./illegalwords.js"); // js file that sets module.exports to an array of banned words
@@ -86,16 +92,7 @@ function Deprecation(res, reason = "") { // if an endpoint is deprecated, use th
     });
 }
 function escapeXML(unsafe) {
-    if (typeof unsafe !== 'string') {
-        if (unsafe) {
-            // This happens when we have hacked blocks from 2.0
-            // See #1030
-            unsafe = String(unsafe);
-        } else {
-            console.error(`Unexptected type ${typeof unsafe} in xmlEscape at: ${new Error().stack}`)
-            return unsafe;
-        }
-    }
+    unsafe = String(unsafe);
     return unsafe.replace(/[<>&'"\n]/g, c => {
         switch (c) {
             case '<': return '&lt;';
@@ -158,7 +155,8 @@ app.use(bodyParser.urlencoded({
 app.use(bodyParser.json({ limit: process.env.ServerSize }));
 app.use((req, res, next) => {
     if (BlockedIPs.includes(req.ip)) return res.sendStatus(403);
-    console.log(`${req.ip}: ${req.originalUrl}`);
+    const username = UsernameIP.get(req.ip) || 'Unknown';
+    console.log(`${req.ip} - (${username}): ${req.originalUrl}`);
     next();
 });
 app.set('trust proxy', 1);
@@ -343,6 +341,25 @@ app.get('/api/errorAllProjectRequests', async function (req, res) { // set the s
         return;
     }
     GlobalRuntimeConfig.set("allowGetProjects", Cast.toBoolean(packet.enabled));
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": 'AppliedStatus' });
+});
+app.get('/api/errorAllProjectUploads', async function (req, res) { // set the state of allowing or preventing all project uploading requests (only admins can use this)
+    const packet = req.query;
+    if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (!AdminAccountUsernames.get(Cast.toString(packet.user))) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+    GlobalRuntimeConfig.set("allowUploadProjects", Cast.toBoolean(packet.enabled));
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": 'AppliedStatus' });
@@ -563,75 +580,98 @@ app.get('/api/pmWrapper/getProject', async function (req, res) { // get data of 
     res.json({ id: json.id, name: json.name, author: { id: -1, username: json.owner, } });
 });
 // scratch auth implementation
-app.get('/api/users/login', async function (req, res) { // login with scratch
+const generateErrorCode = (worked, verifyErr, valid, validRedir, redirect, local) => {
+    if (typeof verifyErr === 'object') {
+        try {
+            verifyErr = JSON.stringify(verifyErr);
+        } catch { // happens if we get recursion
+            verifyErr = '{}';
+        }
+    }
+    
+    const text = [];
+    text.push(worked ? 'CanVerify: true' : 'CanVerify: false');
+    text.push(valid ? 'ValidCode: true' : 'ValidCode: false');
+    text.push(validRedir ? 'ValidRedirect: true' : 'ValidRedirect: false');
+    text.push(local ? 'Local: true' : 'Local: false');
+    text.push('Redirect: ' + (redirect ? redirect : 'NO_REDIRECT'));
+    text.push('VerifyError: ' + (verifyErr ? verifyErr : 'NO_VERIFY_ERR'));
+    return text
+        .map(escapeXML) // sanitize for HTML
+        .map(text => text // sanitize for JS
+            .replaceAll('\\', '\\\\')
+            .replaceAll('`', '\\`')
+            .replaceAll('${', '$\\{')
+            .replaceAll('@', ' @ ') // remember, they'll be sending these in discord!
+        )
+        .join('<br>');
+};
+const failedLoginHTML = fs.readFileSync("./failed_login.html", "utf8");
+const handleLogin = (req, res, local) => {
     const privateCode = Cast.toString(req.query.privateCode);
+    const expectingJSON = Cast.toString(req.header("Content-Type")).endsWith('json');
     UserManager.verifyCode(privateCode).then(response => {
         // check if it is a malicious site
         // note: malicious sites cannot read the private code in the URL if it is the right redirect
         //       thank you cors, you finally did something useful
 
         // malicious APPS could, but at that point your just :trollface:d so :idk_man:
-        const invalidRedirect = response.redirect !== 'https://projects.penguinmod.com/api/users/login';
+        const invalidRedirect = local ? (
+            response.redirect !== 'https://projects.penguinmod.com/api/users/loginLocal'
+            && response.redirect !== 'http://localhost:8080/api/users/loginLocal'
+        ) : (
+            response.redirect !== 'https://projects.penguinmod.com/api/users/login'
+        );
         if ((!response.valid) || (invalidRedirect)) {
+            const errorCode = generateErrorCode(true, null, response.valid, !invalidRedirect, response.redirect, local);
             res.status(400);
-            res.header("Content-Type", 'application/json');
-            res.json({ "error": "InvalidLogin" });
+            if (expectingJSON) {
+                res.header("Content-Type", 'application/json');
+                res.json({ "error": "InvalidLogin", "code": errorCode });
+            } else {
+                res.header("Content-Type", 'text/html');
+                res.send(failedLoginHTML.replace('{{ERROR_CODE}}', errorCode));
+            }
             if (invalidRedirect) {
                 console.log(response.redirect, "tried to falsely authenticate", response.username);
             }
             return;
         }
-        // todo: we should clear the login after a couple days or so
+        // todo: maybe we should clear the login after a couple days or so?
         const username = response.username;
         UserManager.setCode(username, privateCode);
         if (!UserManager.getProperty(username, "firstLogin")) {
             UserManager.setProperty(username, "firstLogin", Date.now());
         }
+        UserManager.setProperty(username, "latestLogin", Date.now());
+        const userIP = req.ip;
+        if (userIP) {
+            // easier if the IP is the key
+            UsernameIP.set(Cast.toString(userIP), username);
+        }
         // close window by opening success.html
         res.header("Content-Type", 'text/html');
         res.status(200);
-        res.sendFile(path.join(__dirname, "./success.html"));
-    }).catch(() => {
+        res.sendFile(path.join(__dirname, 
+            local ? "./success_local.html" : "./success.html"
+        ));
+    }).catch((err) => {
+        const errorCode = generateErrorCode(false, err, false, false, null, local);
         res.status(400);
-        res.header("Content-Type", 'application/json');
-        res.json({ "error": "InvalidLogin" });
+        if (expectingJSON) {
+            res.header("Content-Type", 'application/json');
+            res.json({ "error": "InvalidLogin", "code": errorCode });
+        } else {
+            res.header("Content-Type", 'text/html');
+            res.send(failedLoginHTML.replace('{{ERROR_CODE}}', errorCode));
+        }
     });
+};
+app.get('/api/users/login', async function (req, res) { // login with scratch
+    handleLogin(req, res, false);
 });
 app.get('/api/users/loginLocal', async function (req, res) { // login with local account (like localhost)
-    const privateCode = Cast.toString(req.query.privateCode);
-    UserManager.verifyCode(privateCode).then(response => {
-        // check if it is a malicious site
-        // note: malicious sites cannot read the private code in the URL if it is the right redirect
-        //       thank you cors, you finally did something useful
-
-        // malicious APPS could, but at that point your just :trollface:d so :idk_man:
-        const invalidRedirect =
-            response.redirect !== 'https://projects.penguinmod.com/api/users/loginLocal'
-            && response.redirect !== 'http://localhost:8080/api/users/loginLocal';
-        if ((!response.valid) || (invalidRedirect)) {
-            res.status(400);
-            res.header("Content-Type", 'application/json');
-            res.json({ "error": "InvalidLogin" });
-            if (invalidRedirect) {
-                console.log(response.redirect, "tried to falsely authenticate", response.username);
-            }
-            return;
-        }
-        // todo: we should clear the login after a couple days or so
-        const username = response.username;
-        UserManager.setCode(username, privateCode);
-        if (!UserManager.getProperty(username, "firstLogin")) {
-            UserManager.setProperty(username, "firstLogin", Date.now());
-        }
-        // close window by opening success.html
-        res.header("Content-Type", 'text/html');
-        res.status(200);
-        res.sendFile(path.join(__dirname, "./success_local.html"));
-    }).catch(() => {
-        res.status(400);
-        res.header("Content-Type", 'application/json');
-        res.json({ "error": "InvalidLogin" });
-    });
+    handleLogin(req, res, true);
 });
 // logout
 app.get('/api/users/logout', (req, res) => { // logout
@@ -735,8 +775,8 @@ app.get('/api/users/getMessages', async function (req, res) { // get a users mes
     res.header("Content-Type", 'application/json');
     res.json(returning);
 });
-// we might not actually need this endpoint tbh
-app.post('/api/users/addMessage', async function (req, res) { // add a message to a user (you have to be the user) (by username and private code)
+// nvm, endpoint reused for "guidelines" messages
+app.post('/api/users/addMessage', async function (req, res) { // add a message to a user (by username and private code)
     const packet = req.body;
     if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
         res.status(400);
@@ -775,6 +815,18 @@ app.post('/api/users/addMessage', async function (req, res) { // add a message t
                 type: unsafeMessage.type,
                 text: unsafeMessage.text
             });
+            break;
+        case 'guidelines':
+            if (!AdminAccountUsernames.get(username)) return notallowed();
+            if (typeof unsafeMessage.section !== "string") return invalidate();
+            const db = new Database(`./userdata.json`);
+            const usernames = db.all().map(item => item.key);
+            for (const username of usernames) {
+                UserManager.addMessage(username, {
+                    type: unsafeMessage.type,
+                    section: unsafeMessage.section
+                });
+            }
             break;
         default:
             return invalidate();
@@ -1248,6 +1300,10 @@ app.get('/api/users/report', async function (req, res) {
                 {
                     name: "Reason",
                     value: `${reportedReason}`
+                },
+                {
+                    name: "URL",
+                    value: `https://penguinmod.com/profile?user=${reportedUser}`
                 }
             ],
             author: {
@@ -1407,6 +1463,10 @@ app.get('/api/projects/report', async function (req, res) {
                 {
                     name: "Reason",
                     value: `${reportedReason}`
+                },
+                {
+                    name: "URL",
+                    value: `https://projects.penguinmod.com/${reportedProject}`
                 }
             ],
             author: {
@@ -1691,7 +1751,7 @@ app.post('/api/users/disputeRespond', async function (req, res) {
     fetch(process.env.ApproverLogWebhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(JSON.parse(body))
+        body
     });
 
     res.status(200);
@@ -1732,7 +1792,7 @@ app.get('/api/projects/approve', async function (req, res) {
 
     let idToSetTo = packet.id;
     // idk if db uses a reference to the object or not
-    const project = JSON.parse(JSON.stringify(db.get(Cast.toString(packet.id))));
+    const project = structuredClone(db.get(Cast.toString(packet.id)));
     if (project.updating) {
         isUpdated = true;
     }
@@ -1796,7 +1856,7 @@ app.get('/api/projects/approve', async function (req, res) {
         fetch(process.env.ApproverLogWebhook, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(JSON.parse(body))
+            body
         });
     }
 
@@ -1823,7 +1883,7 @@ app.get('/api/projects/approve', async function (req, res) {
     fetch(process.env.DiscordWebhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(JSON.parse(body))
+        body
     });
     // .then(res => res.text().then(t => console.log("WebhookResponse",res.status,t))).catch(err => console.log("FailedWebhookSend", err))
 });
@@ -1873,13 +1933,13 @@ app.post('/api/projects/reject', async function (req, res) {
     // }
     // post log
     const body = JSON.stringify({
-        content: `"${project.name}" was rejected by ${packet.approver}`,
+        content: `"${project.name}" was removed by ${packet.approver}`,
         embeds: [{
-            title: `${project.name} was rejected`,
+            title: `${project.name} was removed`,
             color: 0xff0000,
             fields: [
                 {
-                    name: "Rejected by",
+                    name: "Removed by",
                     value: `${packet.approver}`
                 },
                 {
@@ -1902,7 +1962,7 @@ app.post('/api/projects/reject', async function (req, res) {
     fetch(process.env.ApproverLogWebhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(JSON.parse(body))
+        body
     });
     // add message
     UserManager.addModeratorMessage(project.owner, {
@@ -2187,7 +2247,7 @@ app.get('/api/projects/feature', async function (req, res) {
         return;
     }
     // idk if db uses a reference to the object or not
-    const project = JSON.parse(JSON.stringify(db.get(idToSetTo)));
+    const project = structuredClone(db.get(idToSetTo));
     if (!project.accepted) {
         res.status(400);
         res.header("Content-Type", 'application/json');
@@ -2230,7 +2290,7 @@ app.get('/api/projects/feature', async function (req, res) {
     fetch(process.env.DiscordWebhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(JSON.parse(body))
+        body
     });
     // .then(res => res.text().then(t => console.log("WebhookResponse",res.status,t))).catch(err => console.log("FailedWebhookSend", err))
 });
@@ -2341,7 +2401,7 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
             fetch(process.env.DiscordWebhook, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(JSON.parse(body))
+                body
             });
         }
     }
@@ -2368,7 +2428,7 @@ app.get('/api/projects/getProjectVote', async function (req, res) {
         return;
     }
     // idk if db uses a reference to the object or not
-    const project = JSON.parse(JSON.stringify(db.get(idToSetTo)));
+    const project = structuredClone(db.get(idToSetTo));
     if (!Array.isArray(project.loves)) {
         project.loves = [];
     }
@@ -2429,6 +2489,12 @@ app.post('/api/projects/update', async function (req, res) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (GlobalRuntimeConfig.get("allowUploadProjects") === false && (!AdminAccountUsernames.get(Cast.toString(packet.requestor)))) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "PublishDisabled" });
         return;
     }
 
@@ -2642,10 +2708,9 @@ app.post('/api/projects/update', async function (req, res) {
     res.json({ "success": true });
 });
 // upload project to the main page
-const UploadsDisabled = Cast.toBoolean(process.env.UploadsDisabled);
 app.post('/api/projects/publish', async function (req, res) {
     const packet = req.body;
-    if (UploadsDisabled && (!AdminAccountUsernames.get(Cast.toString(packet.author)))) {
+    if (GlobalRuntimeConfig.get("allowUploadProjects") === false && (!AdminAccountUsernames.get(Cast.toString(packet.author)))) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "PublishDisabled" });
@@ -3052,6 +3117,7 @@ app.get('/api/projects/search', async function (req, res) {
     const projectOwnerRequired = req.query.user;
     const projectSearchingName = req.query.includes;
     const mustBeFeatured = req.query.featured;
+    const shouldReturnRandomProject = Cast.toBoolean(req.query.random);
     const sortingBy = Cast.toString(req.query.sortby);
 
     // add featured projects first but also sort them by date
@@ -3103,6 +3169,14 @@ app.get('/api/projects/search', async function (req, res) {
     // we set the array to featuredProjectsArray.concat(array) instead of array.concat(featuredProjectsArray)
     // because otherwise the featured projects would be after the normal projects
     const returnArray = featuredProjects.concat(projects);
+    if (shouldReturnRandomProject === true) {
+        // return a random project in this array
+        const project = RandomArrayItem(returnArray);
+        res.header("Content-Type", 'application/json');
+        res.status(200);
+        res.json(project ? {"id": project.id} : {"error": "NoProjectsFound"});
+        return;
+    }
     // make project list
     // new ProjectList() with .toJSON will automatically cut the pages for us
     const projectsList = new ProjectList(returnArray);
@@ -3110,6 +3184,77 @@ app.get('/api/projects/search', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.status(200);
     res.json(returning);
+});
+const recommendedProjectTags = require("./projecttags.json");
+app.get('/api/projects/frontPage', async function (req, res) {
+    if (GlobalRuntimeConfig.get("allowGetProjects") === false) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
+    const db = new Database(`${__dirname}/projects/published.json`);
+
+    // get the list of all projects
+    /**
+     * @type {Array<object>}
+     */
+    const allProjects = db.all()
+        .map(value => { return value.data })
+        .sort((project, sproject) => sproject.date - project.date)
+        .filter(proj => proj.accepted === true);
+
+    const randomTag = RandomArrayItem(recommendedProjectTags.tags);
+    const returnedData = {
+        featured: [],
+        voted: [],
+        liked: [],
+        viewed: [],
+        latest: [],
+        tagged: [],
+        selectedTag: randomTag
+    };
+
+    // start filling this out
+    returnedData.featured = allProjects
+        .filter(proj => proj.featured)
+        .slice(0, 15)
+        .map(proj => ProjectList.sanitizeProjectObject(proj));
+    returnedData.voted = allProjects
+        .filter(proj => !proj.featured)
+        .filter(proj => proj.votes && proj.votes.length > 5) // too low to appear here
+        .sort((project, sproject) => sproject.votes.length - project.votes.length)
+        .slice(0, 15)
+        .map(proj => ProjectList.sanitizeProjectObject(proj));
+    returnedData.liked = allProjects
+        .filter(proj => !proj.featured)
+        .filter(proj => proj.loves && proj.loves.length > 5) // too low to appear here
+        .sort((project, sproject) => sproject.loves.length - project.loves.length)
+        .slice(0, 15)
+        .map(proj => ProjectList.sanitizeProjectObject(proj));
+    returnedData.viewed = allProjects
+        .filter(proj => !proj.featured)
+        .filter(proj => proj.views && proj.views > 30) // too low to appear here
+        .sort((project, sproject) => sproject.views - project.views)
+        .slice(0, 15)
+        .map(proj => ProjectList.sanitizeProjectObject(proj));
+    returnedData.tagged = allProjects
+        .filter(project => {
+            const projectName = Cast.toString(project.name).toLowerCase().trim();
+            const projectDescription = (Cast.toString(project.instructions)
+                + ` ${Cast.toString(project.notes)}`).toLowerCase().trim();
+            return projectDescription.includes(`#${randomTag}`) || projectName.includes(`#${randomTag}`);
+        })
+        .slice(0, 15)
+        .map(proj => ProjectList.sanitizeProjectObject(proj));
+    returnedData.latest = allProjects
+        .slice(0, 15)
+        .map(proj => ProjectList.sanitizeProjectObject(proj));
+
+    res.header("Content-Type", 'application/json');
+    res.status(200);
+    res.json(returnedData);
 });
 
 app.listen(port, () => console.log('Started server on port ' + port));

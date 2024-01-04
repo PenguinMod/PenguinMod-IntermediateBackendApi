@@ -15,6 +15,7 @@ System Volume Information
 cooldown.json
 banned.json
 users.json
+userips.json
 usermessages.json
 userdata.json
 userfeed.json
