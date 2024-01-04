@@ -4,7 +4,7 @@ const { encrypt, decrypt } = require("../utilities/encrypt.js");
 const { ParseJSON } = require("../utilities/safejsonparse.js");
 
 const ScratchAuthURLs = {
-    verifyToken: `https://auth-api.itinerary.eu.org/auth/verifyToken/`,
+    verifyToken: `https://pm-bapi.vercel.app/api/verifyToken?privateCode=`,
 };
 
 const generateId = () => {
