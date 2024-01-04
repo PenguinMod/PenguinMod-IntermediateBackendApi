@@ -78,11 +78,8 @@ class UserManager {
     }
     static async verifyCode(privateCode) {
         const url = ScratchAuthURLs.verifyToken + privateCode;
-        console.log('Attempting to login using', url);
         const res = await fetch(url);
-        console.log('Login Req was status', res.status);
         const json = await res.json();
-        console.log('Login JSON says', json);
         return json;
     }
 

@@ -611,9 +611,7 @@ const failedLoginHTML = fs.readFileSync("./failed_login.html", "utf8");
 const handleLogin = (req, res, local) => {
     const privateCode = Cast.toString(req.query.privateCode);
     const expectingJSON = Cast.toString(req.header("Content-Type")).endsWith('json');
-    console.log('Sending login request');
     UserManager.verifyCode(privateCode).then(response => {
-        console.log('Login request went through');
         // check if it is a malicious site
         // note: malicious sites cannot read the private code in the URL if it is the right redirect
         //       thank you cors, you finally did something useful
@@ -659,7 +657,6 @@ const handleLogin = (req, res, local) => {
             local ? "./success_local.html" : "./success.html"
         ));
     }).catch((err) => {
-        console.log('Login request failed fully', err);
         const errorCode = generateErrorCode(false, err, false, false, null, local);
         res.status(400);
         if (expectingJSON) {
