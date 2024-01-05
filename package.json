@@ -1,7 +1,7 @@
 {
-  "name": "nodejs",
+  "name": "PenguinMod-IntermediateBackendAPI",
   "version": "1.0.0",
-  "description": "",
+  "description": "Backend API for PenguinMod",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -9,7 +9,7 @@
     "update": "git pull"
   },
   "keywords": [],
-  "author": "",
+  "author": "The PenguinMod Team",
   "license": "ISC",
   "dependencies": {
     "@types/node": "^18.0.6",
