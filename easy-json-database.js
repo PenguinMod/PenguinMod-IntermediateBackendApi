@@ -1,13 +1,7 @@
 const fs = require("fs");
 
-const setNestedProperty = (object, key, value) => {
-    const properties = key.split('.');
-    let index = 0;
-    for (; index < properties.length - 1; ++index) {
-        object = object[properties[index]];
-    }
-    object[properties[index]] = value;
-}
+const instances = {};
+let realInstanceCount = 0;
 
 module.exports = class EasyJsonDB {
 
@@ -28,12 +22,22 @@ module.exports = class EasyJsonDB {
      * @param {DatabaseOptions} options
      */
     constructor(filePath, options){
+        if (instances[filePath]) {
+            // if we return an existing instance, javascript will use it instead
+            // see https://stackoverflow.com/questions/11145159/implement-javascript-instance-store-by-returning-existing-instance-from-construc
+            return instances[filePath];
+        }
 
         /**
          * The path of the json file used as database.
          * @type {string}
          */
         this.jsonFilePath = filePath || "./db.json";
+        instances[filePath] = this;
+        realInstanceCount++;
+
+        console.log('New DB Manager created for path:', filePath);
+        console.log('Total instances:', realInstanceCount);
 
         /**
          * The options for the database
@@ -62,6 +66,11 @@ module.exports = class EasyJsonDB {
         } else {
             this.fetchDataFromFile();
         }
+    }
+
+    static _instances = instances;
+    static get _realInstanceCount() {
+        return realInstanceCount;
     }
 
     /**
