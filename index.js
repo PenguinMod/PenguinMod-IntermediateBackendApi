@@ -224,6 +224,11 @@ const GenerateProfileJSON = (username) => {
 
     const followers = UserManager.getFollowers(username);
 
+    let myFeaturedProject = UserManager.getProperty(username, "myFeaturedProject");
+    if (typeof myFeaturedProject !== "number") myFeaturedProject = null;
+    let myFeaturedProjectTitle = UserManager.getProperty(username, "myFeaturedProjectTitle");
+    if (typeof myFeaturedProjectTitle !== "number") myFeaturedProjectTitle = null;
+
     return {
         username,
         admin: AdminAccountUsernames.get(username),
@@ -232,6 +237,8 @@ const GenerateProfileJSON = (username) => {
         badges,
         donator: isDonator,
         rank,
+        myFeaturedProject,
+        myFeaturedProjectTitle,
         followers: followers.length,
         canrankup: canRequestRankUp && rank === 0,
         viewable: userProjects.length > 0,
@@ -962,6 +969,55 @@ app.post('/api/users/setBadges', async function (req, res) { // set a users badg
         success: true,
         newbadges: UserManager.getProperty(target, "badges")
     });
+});
+
+// MyFeaturedProject
+// sets a project for a user to display on their profile
+app.post('/api/users/setMyFeaturedProject', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (UserManager.isBanned(packet.username)) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
+    if (typeof packet.id !== 'number') {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "IDNotSpecified" });
+        return;
+    }
+    if (packet.id < 0) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidID" });
+        return;
+    }
+    if (typeof packet.title !== 'number') {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "TitleNotSpecified" });
+        return;
+    }
+    if (packet.title < 0 || packet.title > 15) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidTitleType" });
+        return;
+    }
+    UserManager.setProperty(packet.username, "myFeaturedProject", Math.round(packet.id));
+    UserManager.setProperty(packet.username, "myFeaturedProjectTitle", Math.round(packet.title));
+
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
 });
 
 // following
@@ -2486,7 +2542,6 @@ app.get('/api/projects/delete', async function (req, res) {
     res.json({ "success": true });
 });
 // update uploaded projects
-// todo: replace /approve's newMeta stuff with this endpoint?
 app.post('/api/projects/update', async function (req, res) {
     const packet = req.body;
     if (!UserManager.isCorrectCode(packet.requestor, packet.passcode)) {
