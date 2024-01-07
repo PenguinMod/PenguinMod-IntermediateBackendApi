@@ -370,9 +370,9 @@ app.get('/api/errorAllProjectUploads', async function (req, res) { // set the st
 });
 let cachedStats = null;
 let lastStatAccess = Date.now();
-const fiveMinutes = 5 * 60 * 1000
+const tenMinutes = 10 * 60 * 1000
 const cacheNewStats = async () => new Promise(resolve => {
-    console.log('gathering data for site stats')
+    console.log('gathering data for site stats');
     os.cpuUsage((cpuUsage) => {
         const db = new Database(`${__dirname}/projects/published.json`);
         const userReports = UserManager.getAllReports();
@@ -382,50 +382,47 @@ const cacheNewStats = async () => new Promise(resolve => {
         let inaccessible = 0;
         let unapproved = 0;
         let featured = 0;
-        let broken = 0;
         let remixes = 0;
         const users = [];
         const projects = db.all();
         for (const {data: project} of projects) {
-            if (!users.includes(project.owner)) users.push(project.owner)
-            if (!project.approved) unapproved++
-            if (project.featured) featured++
-            if (project.remix) remixes++
-            all++
-            const saveExists = fs.existsSync(`./projects/uploaded/p${project.id}.pmp`)
-            if (!saveExists) broken++
-            if (!project.approved || project.hidden || !saveExists) {
-                inaccessible++
+            if (!users.includes(project.owner)) users.push(project.owner);
+            if (!project.accepted) unapproved++;
+            if (project.featured) featured++;
+            if (project.remix) remixes++;
+            all++;
+            if (!project.accepted || project.hidden) {
+                inaccessible++;
             }
         }
 
-        console.log('caching site stats')
-        lastStatAccess = Date.now()
+        console.log('caching site stats');
+        lastStatAccess = Date.now();
         cachedStats = {
             all,
             inaccessible,
             unapproved,
             featured,
-            broken,
+            remixes,
             reportedProjects: reportDB
                 .all()
                 .filter(rej => rej.exists).length,
             reportedUsers: userReports.length,
             users: users.length,
             new: true,
-            nextRead: lastStatAccess + fiveMinutes,
+            nextRead: lastStatAccess + tenMinutes,
             freeMem: os.freemem(),
             totalMem: os.totalmem(),
             cpuUsage: cpuUsage * 100
         }
-        console.log('finnished caching site stats')
-        resolve()
-    })
+        console.log('finished caching site stats');
+        resolve();
+    });
 });
 // get counts on various site things
 app.get('/api/projects/getSiteStats', async function (req, res) {
     // force updates to only happen every five minutes
-    if (!cachedStats || Date.now() > lastStatAccess + fiveMinutes) await cacheNewStats()
+    if (!cachedStats || Date.now() > lastStatAccess + tenMinutes) await cacheNewStats();
 
     res.header("Content-Type", 'application/json');
     res.status(200);
