@@ -377,23 +377,26 @@ const cacheNewStats = async () => new Promise(resolve => {
         const db = new Database(`${__dirname}/projects/published.json`);
         const userReports = UserManager.getAllReports();
         const reportDB = new Database(`./projectreports.json`);
+        const userDB = new Database(`./userdata.json`);
 
-        let all = 0;
+        const projects = db.all();
+        let all = projects.length;
         let inaccessible = 0;
         let unapproved = 0;
         let featured = 0;
         let remixes = 0;
         const users = [];
-        const projects = db.all();
         for (const {data: project} of projects) {
             if (!users.includes(project.owner)) users.push(project.owner);
             if (!project.accepted) unapproved++;
             if (project.featured) featured++;
             if (project.remix) remixes++;
-            all++;
             if (!project.accepted || project.hidden) {
                 inaccessible++;
             }
+        }
+        for (const username of Object.keys(userDB.data)) {
+            if (!users.includes(username)) users.push(username);
         }
 
         console.log('caching site stats');
