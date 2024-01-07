@@ -31,6 +31,8 @@ const ProjectList = require("./classes/ProjectList.js");
 const GenericList = require("./classes/GenericList.js");
 const ReportList = require("./classes/ReportList.js");
 
+const ProfanityChecker = require("./classes/ProfanityChecker.js");
+
 const AdminAccountUsernames = new Database(`${__dirname}/admins.json`);
 const ApproverUsernames = new Database(`${__dirname}/approvers.json`);
 
@@ -67,21 +69,6 @@ function RandomArrayItem(arr) {
     const rng = Math.round(Math.random() * (arr.length - 1));
     return arr[rng];
 }
-
-const illegalWordsList = require("./illegalwords.js"); // js file that sets module.exports to an array of banned words
-const CheckForIllegalWording = (...args) => {
-    for (const argument of args) {
-        for (const illegalWord of illegalWordsList) {
-            const checking = Cast.toString(argument)
-                .toLowerCase()
-                .replace(/[ _\-!?.#/\\,'"@$%^&*\(\)]+/gmi, '');
-            if (checking.includes(illegalWord)) {
-                return true;
-            }
-        }
-    }
-    return false;
-};
 
 function Deprecation(res, reason = "") { // if an endpoint is deprecated, use this.
     res.status(400);
@@ -206,7 +193,7 @@ app.get('/:id', async function (req, res) {
 });
 
 // profile stuff
-const GenerateProfileJSON = (username) => {
+const GenerateProfileJSON = (username, includeBio) => {
     const rawBadges = UserManager.getProperty(username, "badges");
     const badges = Array.isArray(rawBadges) ? rawBadges : [];
     const isDonator = badges.includes('donator');
@@ -229,14 +216,21 @@ const GenerateProfileJSON = (username) => {
     let myFeaturedProjectTitle = UserManager.getProperty(username, "myFeaturedProjectTitle");
     if (typeof myFeaturedProjectTitle !== "number") myFeaturedProjectTitle = null;
 
+    const isBanned = UserManager.isBanned(username);
+    let bio = '';
+    if (!isBanned && includeBio) {
+        bio = UserManager.getProperty(username, "profileBio");
+    }
+
     return {
         username,
         admin: AdminAccountUsernames.get(username),
         approver: ApproverUsernames.get(username),
-        banned: UserManager.isBanned(username), // skipped in /profile but provided in /usernameFromCode
+        banned: isBanned, // skipped in /profile but provided in /usernameFromCode
         badges,
         donator: isDonator,
         rank,
+        bio,
         myFeaturedProject,
         myFeaturedProjectTitle,
         followers: followers.length,
@@ -247,6 +241,7 @@ const GenerateProfileJSON = (username) => {
 };
 app.get('/api/users/profile', async function (req, res) { // check if user is banned
     const username = Cast.toString(req.query.username);
+    const includeBio = Cast.toBoolean(req.query.bio);
     if (typeof username !== "string") {
         res.status(400);
         res.header("Content-Type", 'application/json');
@@ -261,7 +256,7 @@ app.get('/api/users/profile', async function (req, res) { // check if user is ba
     }
     res.status(200);
     res.header("Content-Type", 'application/json');
-    res.json(GenerateProfileJSON(username));
+    res.json(GenerateProfileJSON(username, includeBio));
 });
 app.post('/api/users/requestRankUp', async function (req, res) {
     const packet = req.body;
@@ -1006,7 +1001,7 @@ app.post('/api/users/setMyFeaturedProject', async function (req, res) {
         res.json({ "error": "TitleNotSpecified" });
         return;
     }
-    if (packet.title < 0 || packet.title > 15) {
+    if (packet.title < 0 || packet.title > 500) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "InvalidTitleType" });
@@ -1014,6 +1009,121 @@ app.post('/api/users/setMyFeaturedProject', async function (req, res) {
     }
     UserManager.setProperty(packet.username, "myFeaturedProject", Math.round(packet.id));
     UserManager.setProperty(packet.username, "myFeaturedProjectTitle", Math.round(packet.title));
+
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
+});
+// About Me
+// sets text for a user to display on their profile
+app.post('/api/users/setBio', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (UserManager.isBanned(packet.username)) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
+    if (typeof packet.bio !== 'string') {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidBioInput" });
+        return;
+    }
+    if (packet.bio.length > 2048) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "BioLengthMustBeLessThan2048Chars" });
+        return;
+    }
+    if (ProfanityChecker.containsUnsafeContent(packet.bio)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "IllegalWordsUsed" });
+        ProfanityChecker.sendHeatLog(packet.bio, "profileBio", packet.username);
+        return;
+    }
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.bio, "profileBio", packet.username);
+    UserManager.setProperty(packet.username, "profileBio", packet.bio);
+
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
+});
+// (ADMIN) sets text for another user to display on their profile
+app.post('/api/users/setUserBioAdmin', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (
+        !AdminAccountUsernames.get(Cast.toString(packet.username))
+        && !ApproverUsernames.get(Cast.toString(packet.username))
+    ) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
+    if (!packet.target || typeof packet.bio !== 'target') {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidTarget" });
+        return;
+    }
+    if (typeof packet.bio !== 'string') {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidBioInput" });
+        return;
+    }
+    if (packet.bio.length > 2048) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "BioLengthMustBeLessThan2048Chars" });
+        return;
+    }
+    UserManager.setProperty(packet.target, "profileBio", packet.bio);
+    const body = JSON.stringify({
+        content: `${packet.target}'s bio was edited by ${packet.username}`,
+        embeds: [{
+            title: `${packet.target} had their bio edited`,
+            color: 0xff0000,
+            description: packet.bio,
+            fields: [
+                {
+                    name: "Edited by",
+                    value: `${packet.username}`
+                },
+                {
+                    name: "URL",
+                    value: `https://penguinmod.com/profile?user=${packet.target}`
+                },
+            ],
+            author: {
+                name: String(packet.target).substring(0, 50),
+                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(packet.target).substring(0, 50)),
+                url: String("https://penguinmod.com/profile?user=" + String(packet.target).substring(0, 50))
+            },
+            timestamp: new Date().toISOString()
+        }]
+    });
+    fetch(process.env.ApproverLogWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body
+    });
 
     res.status(200);
     res.header("Content-Type", 'application/json');
@@ -2582,15 +2692,16 @@ app.post('/api/projects/update', async function (req, res) {
             return;
         }
     }
+    let newMetadata = {};
     if (typeof packet.newMeta === "string") {
-        const newMetadata = SafeJSONParse(packet.newMeta);
+        newMetadata = SafeJSONParse(packet.newMeta);
         let updatingProject = false;
         if (typeof newMetadata.name === "string") {
-            project.name = newMetadata.name;
-            if (CheckForIllegalWording(newMetadata.name)) {
+            if (ProfanityChecker.containsUnsafeContent(newMetadata.name)) {
                 res.status(400);
                 res.header("Content-Type", 'application/json');
                 res.json({ "error": "IllegalWordsUsed" });
+                ProfanityChecker.sendHeatLog(newMetadata.name, "projectName", [id, packet.requestor]);
                 if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
                 return;
             }
@@ -2601,14 +2712,15 @@ app.post('/api/projects/update', async function (req, res) {
                 if (DEBUG_logAllFailedData) console.log("Title3-50Chars", packet);
                 return;
             }
+            project.name = newMetadata.name;
             updatingProject = true;
         }
         if (typeof newMetadata.instructions === "string") {
-            project.instructions = newMetadata.instructions;
-            if (CheckForIllegalWording(newMetadata.instructions)) {
+            if (ProfanityChecker.containsUnsafeContent(newMetadata.instructions)) {
                 res.status(400);
                 res.header("Content-Type", 'application/json');
                 res.json({ "error": "IllegalWordsUsed" });
+                ProfanityChecker.sendHeatLog(newMetadata.instructions, "projectInstructions", [id, packet.requestor]);
                 if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
                 return;
             }
@@ -2619,14 +2731,15 @@ app.post('/api/projects/update', async function (req, res) {
                 if (DEBUG_logAllFailedData) console.log("Instructions4096Longer", packet);
                 return;
             }
+            project.instructions = newMetadata.instructions;
             updatingProject = true;
         }
         if (typeof newMetadata.notes === "string") {
-            project.notes = newMetadata.notes;
-            if (CheckForIllegalWording(newMetadata.notes)) {
+            if (ProfanityChecker.containsUnsafeContent(newMetadata.notes)) {
                 res.status(400);
                 res.header("Content-Type", 'application/json');
                 res.json({ "error": "IllegalWordsUsed" });
+                ProfanityChecker.sendHeatLog(newMetadata.notes, "projectNotes", [id, packet.requestor]);
                 if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
                 return;
             }
@@ -2637,6 +2750,7 @@ app.post('/api/projects/update', async function (req, res) {
                 if (DEBUG_logAllFailedData) console.log("Notes4096Longer", packet);
                 return;
             }
+            project.notes = newMetadata.notes;
             updatingProject = true;
         }
         // if yea then do
@@ -2759,6 +2873,9 @@ app.post('/api/projects/update', async function (req, res) {
     //         body: body
     //     });
     // }
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(newMetadata.name, "projectName", [id, packet.requestor]);
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(newMetadata.instructions, "projectInstructions", [id, packet.requestor]);
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(newMetadata.notes, "projectNotes", [id, packet.requestor]);
     // set in DB
     db.set(String(id), project);
     console.log(packet.requestor, "updated", id);
@@ -2888,24 +3005,27 @@ app.post('/api/projects/publish', async function (req, res) {
         return;
     }
 
-    if (CheckForIllegalWording(packet.title)) {
+    if (ProfanityChecker.containsUnsafeContent(packet.title)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "IllegalWordsUsed" });
+        ProfanityChecker.sendHeatLog(packet.title, "projectName", packet.author);
         if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
         return;
     }
-    if (packet.instructions && CheckForIllegalWording(packet.instructions)) {
+    if (packet.instructions && ProfanityChecker.containsUnsafeContent(packet.instructions)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "IllegalWordsUsed" });
+        ProfanityChecker.sendHeatLog(packet.instructions, "projectInstructions", packet.author);
         if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
         return;
     }
-    if (packet.notes && CheckForIllegalWording(packet.notes)) {
+    if (packet.notes && ProfanityChecker.containsUnsafeContent(packet.notes)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "IllegalWordsUsed" });
+        ProfanityChecker.sendHeatLog(packet.notes, "projectNotes", packet.author);
         if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
         return;
     }
@@ -3070,6 +3190,10 @@ app.post('/api/projects/publish', async function (req, res) {
         rating: packet.rating, // E, E+10, T ratings (or ? for old projects)
         restrictions: packet.restrictions, // array of restrictions on this project (ex: blood, flashing lights)
     });
+
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.title, "projectName", packet.author);
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.instructions, "projectInstructions", packet.author);
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.notes, "projectNotes", packet.author);
 
     // log for approvers
     // const body = JSON.stringify({
