@@ -8,6 +8,7 @@ const jimp = require("jimp");
 const JSZip = require("jszip");
 const Database = require("./easy-json-database");
 const Cast = require("./classes/Cast.js");
+const os = require("os-utils");
 
 const DEBUG_logAllFailedData = Cast.toBoolean(process.env.LogFailedData);
 
@@ -366,6 +367,70 @@ app.get('/api/errorAllProjectUploads', async function (req, res) { // set the st
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "success": 'AppliedStatus' });
+});
+let cachedStats = null;
+let lastStatAccess = Date.now();
+const fiveMinutes = 5 * 60 * 1000
+const cacheNewStats = async () => new Promise(resolve => {
+    console.log('gathering data for site stats')
+    os.cpuUsage((cpuUsage) => {
+        const db = new Database(`${__dirname}/projects/published.json`);
+        const userReports = UserManager.getAllReports();
+        const reportDB = new Database(`./projectreports.json`);
+
+        let all = 0;
+        let inaccessible = 0;
+        let unapproved = 0;
+        let featured = 0;
+        let broken = 0;
+        let remixes = 0;
+        const users = [];
+        const projects = db.all();
+        for (const {data: project} of projects) {
+            if (!users.includes(project.owner)) users.push(project.owner)
+            if (!project.approved) unapproved++
+            if (project.featured) featured++
+            if (project.remix) remixes++
+            all++
+            const saveExists = fs.existsSync(`./projects/uploaded/p${project.id}.pmp`)
+            if (!saveExists) broken++
+            if (!project.approved || project.hidden || !saveExists) {
+                inaccessible++
+            }
+        }
+
+        console.log('caching site stats')
+        lastStatAccess = Date.now()
+        cachedStats = {
+            all,
+            inaccessible,
+            unapproved,
+            featured,
+            broken,
+            reportedProjects: reportDB
+                .all()
+                .filter(rej => rej.exists).length,
+            reportedUsers: userReports.length,
+            users: users.length,
+            new: true,
+            nextRead: lastStatAccess + fiveMinutes,
+            freeMem: os.freemem(),
+            totalMem: os.totalmem(),
+            cpuUsage: cpuUsage * 100
+        }
+        console.log('finnished caching site stats')
+        resolve()
+    })
+});
+// get counts on various site things
+app.get('/api/projects/getSiteStats', async function (req, res) {
+    // force updates to only happen every five minutes
+    if (!cachedStats || Date.now() > lastStatAccess + fiveMinutes) await cacheNewStats()
+
+    res.header("Content-Type", 'application/json');
+    res.status(200);
+    res.json(cachedStats);
+    cachedStats.new = false;
 });
 // get approved projects
 app.get('/api/projects/getApproved', async function (req, res) {
