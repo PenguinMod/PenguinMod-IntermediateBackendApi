@@ -436,7 +436,7 @@ app.get('/api/projects/getSiteStats', async function (req, res) {
 });
 // returns who has perms
 // made to ensure no one has perms they shouldnt have, limited to only mods and admins
-app.get('/api/projects/getSiteMods', async function (req, res) {
+app.get('/api/users/getSiteMods', async function (req, res) {
     const packet = req.query;
     if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
         res.status(400);
