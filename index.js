@@ -1170,7 +1170,7 @@ app.post('/api/users/setUserBioAdmin', async function (req, res) {
         return;
     }
 
-    if (!packet.target || typeof packet.bio !== 'target') {
+    if (!packet.target || typeof packet.target !== 'string') {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "InvalidTarget" });
