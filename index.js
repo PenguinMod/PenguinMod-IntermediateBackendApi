@@ -457,8 +457,8 @@ app.get('/api/users/getSiteMods', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.status(200);
     res.json({
-        admins: AdminAccountUsernames.filter(({data}) => data).map(({key}) => key),
-        mods: ApproverUsernames.filter(({data}) => data).map(({key}) => key)
+        admins: AdminAccountUsernames.all().filter(({data}) => data).map(({key}) => key),
+        mods: ApproverUsernames.all().filter(({data}) => data).map(({key}) => key)
     });
 });
 // get approved projects
