@@ -412,6 +412,8 @@ const cacheNewStats = async () => new Promise(resolve => {
                 .filter(rej => rej.exists).length,
             reportedUsers: userReports.length,
             users: users.length,
+            admins: AdminAccountUsernames.all().length,
+            mods: ApproverUsernames.all().length,
             new: true,
             nextRead: lastStatAccess + tenMinutes,
             freeMem: os.freemem(),
@@ -431,6 +433,33 @@ app.get('/api/projects/getSiteStats', async function (req, res) {
     res.status(200);
     res.json(cachedStats);
     cachedStats.new = false;
+});
+// returns who has perms
+// made to ensure no one has perms they shouldnt have, limited to only mods and admins
+app.get('/api/projects/getSiteMods', async function (req, res) {
+    const packet = req.query;
+    if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (
+        !AdminAccountUsernames.get(Cast.toString(packet.user))
+        && !ApproverUsernames.get(Cast.toString(packet.user))
+    ) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "ThisAccountCannotAccessThisInformation" });
+        return;
+    }
+
+    res.header("Content-Type", 'application/json');
+    res.status(200);
+    res.json({
+        admins: AdminAccountUsernames.filter(({data}) => data).map(({key}) => key),
+        mods: ApproverUsernames.filter(({data}) => data).map(({key}) => key)
+    });
 });
 // get approved projects
 app.get('/api/projects/getApproved', async function (req, res) {
