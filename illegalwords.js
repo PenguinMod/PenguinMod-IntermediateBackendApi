@@ -167,10 +167,23 @@ const potentiallyUnsafeWordsSpacedOut = [
     'krill'
 ];
 
+const allTextChecks = []
+    .concat(includingWords, illegalWebsites)
+    .map(text => ['illegal', text])
+    .concat(potentiallyUnsafeWords)
+    .map(text => Array.isArray(text) ? text : ['unsafe', text])
+const allSpacedTextChecks = []
+    .concat(spacedOutWordsOnly)
+    .map(text => ['illegal', text])
+    .concat(potentiallyUnsafeWordsSpacedOut)
+    .map(text => Array.isArray(text) ? text : ['unsafe', text])
+
 module.exports = {
     includingWords,
     illegalWebsites,
     spacedOutWordsOnly,
     potentiallyUnsafeWords,
-    potentiallyUnsafeWordsSpacedOut
+    potentiallyUnsafeWordsSpacedOut,
+    allTextChecks,
+    allSpacedTextChecks
 };
