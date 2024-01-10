@@ -81,9 +81,9 @@ class ProfanityChecker {
             for (const [type, illegalWord] of illegalWords.allSpacedTextChecks) {
                 const indexOfSpaced = word.indexOf(illegalWord)
                 if (indexOfSpaced > -1) {
-                    let offender = word.slice(indexOfSpaced, word.length)
+                    let offender = word.slice(indexOfSpaced, illegalWord.length)
                     let left = word.slice(0, indexOfSpaced)
-                    let right = word.slice(indexOfSpaced + word.length)
+                    let right = word.slice(indexOfSpaced + illegalWord.length)
                     left += type === 'unsafe' 
                         ? unsafeAnsi
                         : illegalAnsi
@@ -113,9 +113,9 @@ class ProfanityChecker {
                     // make sure we handle such a situation
                     let endBreakIdx = breaks.findIndex(b => b > indexOfUnsafe + word.length)
                     if (endBreakIdx < 0) endBreakIdx = breakIdx
-                    let offender = word.slice(indexOfUnsafe, word.length)
+                    let offender = word.slice(indexOfUnsafe, illegalWord.length)
                     let left = word.slice(0, indexOfUnsafe)
-                    let right = word.slice(indexOfUnsafe + word.length)
+                    let right = word.slice(indexOfUnsafe + illegalWord.length)
                     left += ansiPrefix
                     breaks[breakIdx] += ansiPrefix.length
                     offender += defaultAnsi
