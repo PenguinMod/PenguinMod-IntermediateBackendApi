@@ -79,7 +79,7 @@ class ProfanityChecker {
         for (let i = 0; i < text.length; i += 2) {
             let word = text[i]
             for (const [type, illegalWord] of illegalWords.allSpacedTextChecks) {
-                const indexOfSpaced = word.indexOf(illegalWord)
+                const indexOfSpaced = word.toLowerCase().indexOf(illegalWord)
                 if (indexOfSpaced > -1) {
                     let offender = word.slice(indexOfSpaced, illegalWord.length)
                     let left = word.slice(0, indexOfSpaced)
@@ -103,7 +103,7 @@ class ProfanityChecker {
                     l++
                 }
 
-                const indexOfUnsafe = word.indexOf(illegalWord)
+                const indexOfUnsafe = word.toLowerCase().indexOf(illegalWord)
                 if (indexOfUnsafe > -1) {
                     const ansiPrefix = type === 'unsafe' 
                         ? unsafeAnsi
