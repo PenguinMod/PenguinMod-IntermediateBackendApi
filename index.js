@@ -3285,9 +3285,9 @@ app.post('/api/projects/publish', async function (req, res) {
         restrictions: packet.restrictions, // array of restrictions on this project (ex: blood, flashing lights)
     });
 
-    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.title, "projectName", packet.author);
-    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.instructions, "projectInstructions", packet.author);
-    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.notes, "projectNotes", packet.author);
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.title, "projectName", [id, packet.author]);
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.instructions, "projectInstructions", [id, packet.author]);
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.notes, "projectNotes", [id, packet.author]);
 
     // log for approvers
     // const body = JSON.stringify({
