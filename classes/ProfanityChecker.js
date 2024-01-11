@@ -80,13 +80,15 @@ class ProfanityChecker {
             let word = text[i]
             for (const [type, illegalWord] of illegalWords.allSpacedTextChecks) {
                 const indexOfSpaced = word.toLowerCase().indexOf(illegalWord)
+                const endOfSpaced = indexOfSpaced + illegalWord.length
                 if (indexOfSpaced > -1) {
-                    let offender = word.slice(indexOfSpaced, illegalWord.length)
-                    let left = word.slice(0, indexOfSpaced)
-                    let right = word.slice(indexOfSpaced + illegalWord.length)
-                    left += type === 'unsafe' 
+                    const ansiPrefix = type === 'unsafe' 
                         ? unsafeAnsi
                         : illegalAnsi
+                    let offender = word.slice(indexOfSpaced, endOfSpaced)
+                    let left = word.slice(0, indexOfSpaced)
+                    let right = word.slice(endOfSpaced)
+                    left += ansiPrefix
                     offender += defaultAnsi
                     left += offender
                     left += right
@@ -104,6 +106,7 @@ class ProfanityChecker {
                 }
 
                 const indexOfUnsafe = word.toLowerCase().indexOf(illegalWord)
+                const endOfUnsafe = indexOfUnsafe + illegalWord.length
                 if (indexOfUnsafe > -1) {
                     const ansiPrefix = type === 'unsafe' 
                         ? unsafeAnsi
@@ -113,9 +116,9 @@ class ProfanityChecker {
                     // make sure we handle such a situation
                     let endBreakIdx = breaks.findIndex(b => b > indexOfUnsafe + word.length)
                     if (endBreakIdx < 0) endBreakIdx = breakIdx
-                    let offender = word.slice(indexOfUnsafe, illegalWord.length)
+                    let offender = word.slice(indexOfUnsafe, endOfUnsafe)
                     let left = word.slice(0, indexOfUnsafe)
-                    let right = word.slice(indexOfUnsafe + illegalWord.length)
+                    let right = word.slice(endOfUnsafe)
                     left += ansiPrefix
                     breaks[breakIdx] += ansiPrefix.length
                     offender += defaultAnsi
