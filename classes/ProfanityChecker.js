@@ -64,6 +64,14 @@ const splitString = text => {
     resArray.push(text.slice(lastEnd))
     return resArray
 }
+const findIndexOfBreak = (breaks, strIdx, alsoEquals) => {
+    let length = 0
+    for (const brIdx in breaks) {
+        length += breaks[brIdx]
+        if (length > strIdx || (alsoEquals && length === strIdx)) return brIdx
+    }
+    return -1
+}
 
 class ProfanityChecker {
     static containsUnsafeContent = CheckForIllegalWording;
@@ -97,44 +105,51 @@ class ProfanityChecker {
             }
             for (const [type, illegalWord] of illegalWords.allTextChecks) {
                 const breaks = [word.length]
-                let lastBreak = word.length
-                let l = 0
-                while (word <= illegalWord.length && text[i + (2 * l)]) {
-                    breaks.push(lastBreak += word.length)
-                    word += text[i + (2 * l)]
-                    l++
+                let l = 2
+                let collapsedWord = word
+                while (collapsedWord.length < illegalWord.length && text[i + l]) {
+                    const str = text[i + l]
+                    breaks.push(str.length)
+                    collapsedWord += str
+                    l += 2
                 }
 
-                const indexOfUnsafe = word.toLowerCase().indexOf(illegalWord)
+                const indexOfUnsafe = collapsedWord.toLowerCase().indexOf(illegalWord)
                 const endOfUnsafe = indexOfUnsafe + illegalWord.length
                 if (indexOfUnsafe > -1) {
+                    console.log(collapsedWord, breaks)
                     const ansiPrefix = type === 'unsafe' 
                         ? unsafeAnsi
                         : illegalAnsi
-                    const breakIdx = breaks.findIndex(b => b > indexOfUnsafe)
+                    const breakIdx = findIndexOfBreak(breaks, indexOfUnsafe)
                     // this should be the same as the previous, but it can just not be
                     // make sure we handle such a situation
-                    let endBreakIdx = breaks.findIndex(b => b > indexOfUnsafe + word.length)
-                    if (endBreakIdx < 0) endBreakIdx = breakIdx
-                    let offender = word.slice(indexOfUnsafe, endOfUnsafe)
-                    let left = word.slice(0, indexOfUnsafe)
-                    let right = word.slice(endOfUnsafe)
-                    left += ansiPrefix
+                    const endBreakIdx = findIndexOfBreak(breaks, endOfUnsafe, true)
+                    let offender = collapsedWord.slice(indexOfUnsafe, endOfUnsafe)
+                    let left = collapsedWord.slice(0, indexOfUnsafe)
+                    let right = collapsedWord.slice(endOfUnsafe)
                     breaks[breakIdx] += ansiPrefix.length
+                    left += ansiPrefix
                     offender += defaultAnsi
+                    console.log(offender, breakIdx, endBreakIdx, indexOfUnsafe, endOfUnsafe)
                     breaks[endBreakIdx] += defaultAnsi.length
                     left += offender
                     left += right
-                    word = left
+                    console.log(collapsedWord)
+                    collapsedWord = left
+                    console.log(collapsedWord)
+
+                    let lastBreak = 0
+                    for (const breakItem of breaks) {
+                        text[i] = collapsedWord.slice(lastBreak, lastBreak += breakItem)
+                        console.log(breakItem, lastBreak, text[i])
+                        i += 2
+                    }
+
+                    word = text[i]
                 }
 
-                lastBreak = 0
-                for (const breakIdx in breaks) {
-                    const breakItem = breaks[breakIdx]
-                    text[i + (2 * breakIdx)] = word.slice(lastBreak, breakItem)
-                    lastBreak = breakItem
-                }
-                word = text[i]
+                if (!word) break;
             }
         }
 

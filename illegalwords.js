@@ -168,12 +168,12 @@ const potentiallyUnsafeWordsSpacedOut = [
 ];
 
 const allTextChecks = []
-    .concat(includingWords, illegalWebsites)
+    .concat(includingWords)
     .map(text => ['illegal', text])
     .concat(potentiallyUnsafeWords)
     .map(text => Array.isArray(text) ? text : ['unsafe', text])
 const allSpacedTextChecks = []
-    .concat(spacedOutWordsOnly)
+    .concat(spacedOutWordsOnly, illegalWebsites)
     .map(text => ['illegal', text])
     .concat(potentiallyUnsafeWordsSpacedOut)
     .map(text => Array.isArray(text) ? text : ['unsafe', text])
