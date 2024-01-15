@@ -117,7 +117,6 @@ class ProfanityChecker {
                 const indexOfUnsafe = collapsedWord.toLowerCase().indexOf(illegalWord)
                 const endOfUnsafe = indexOfUnsafe + illegalWord.length
                 if (indexOfUnsafe > -1) {
-                    console.log(collapsedWord, breaks)
                     const ansiPrefix = type === 'unsafe' 
                         ? unsafeAnsi
                         : illegalAnsi
@@ -131,18 +130,14 @@ class ProfanityChecker {
                     breaks[breakIdx] += ansiPrefix.length
                     left += ansiPrefix
                     offender += defaultAnsi
-                    console.log(offender, breakIdx, endBreakIdx, indexOfUnsafe, endOfUnsafe)
                     breaks[endBreakIdx] += defaultAnsi.length
                     left += offender
                     left += right
-                    console.log(collapsedWord)
                     collapsedWord = left
-                    console.log(collapsedWord)
 
                     let lastBreak = 0
                     for (const breakItem of breaks) {
                         text[i] = collapsedWord.slice(lastBreak, lastBreak += breakItem)
-                        console.log(breakItem, lastBreak, text[i])
                         i += 2
                     }
 
