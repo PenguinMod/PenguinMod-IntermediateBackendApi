@@ -330,6 +330,110 @@ app.get('/api/users/assignPossition', async function (req, res) { // give someon
     res.header("Content-Type", 'application/json');
     res.json({ "success": 'AppliedStatus' });
 });
+app.get('/api/users/getProfanityList', async function (req, res) {
+    const packet = req.query;
+    if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (!AdminAccountUsernames.get(Cast.toString(packet.user))) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+    const illegalWords = ProfanityChecker.getIllegalWords();
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json(illegalWords);
+});
+app.post('/api/users/setProfanityList', async function (req, res) { // set the profanity list json
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (!AdminAccountUsernames.get(Cast.toString(packet.user))) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+    const words = packet.json;
+    if (typeof words !== 'object' || Array.isArray(words)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidData" });
+        return;
+    }
+    // check for keys
+    const keys = ["includingWords", "illegalWebsites", "spacedOutWordsOnly", "potentiallyUnsafeWords", "potentiallyUnsafeWordsSpacedOut"];
+    for (const key of keys) {
+        if (!Array.isArray(words[key])) {
+            res.status(400);
+            res.header("Content-Type", 'application/json');
+            res.json({ "error": "InvalidData" });
+            return;
+        }
+    }
+    for (const newKey in words) {
+        if (!keys.includes(newKey)) {
+            res.status(400);
+            res.header("Content-Type", 'application/json');
+            res.json({ "error": "InvalidData" });
+            return;
+        }
+    }
+    // send diff
+    const illegalWords = ProfanityChecker.getIllegalWords();
+    const diffText = ['```ansi'];
+    for (const key of keys) {
+        diffText.push(key);
+        const newList = words[key];
+        const oldList = illegalWords[key];
+        for (const word of newList) {
+            if (!oldList.includes(word)) {
+                diffText.push(`\x1b[32;1m+ ${word}\x1b[0m`);
+            }
+        }
+        for (const word of oldList) {
+            if (!newList.includes(word)) {
+                diffText.push(`\x1b[31;1m- ${word}\x1b[0m`);
+            }
+        }
+    }
+    diffText.push('```');
+    ProfanityChecker.setIllegalWords(words);
+    // send log
+    const embedText = diffText.join('\n');
+    const body = JSON.stringify({
+        content: `${packet.user} updated filtering words`,
+        embeds: [{
+            title: `Filter Words changed by ${packet.user}`,
+            color: 0x00c3ff,
+            description: embedText,
+            author: {
+                name: String(packet.user).substring(0, 50),
+                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(packet.user).substring(0, 50)),
+                url: String("https://penguinmod.com/profile?user=" + String(packet.user).substring(0, 50))
+            },
+            timestamp: new Date().toISOString()
+        }]
+    });
+    fetch(process.env.ApproverLogWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body
+    });
+    // ok yea go successepic win
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
+});
 app.get('/api/errorAllProjectRequests', async function (req, res) { // set the state of allowing or preventing all project info getting requests (only admins can use this)
     const packet = req.query;
     if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
