@@ -21,7 +21,6 @@ const includingWords = [
     "penis",
     "mycock",
     "mydick",
-    "shit",
     "fuck",
     "condom",
     "butthole",
@@ -156,7 +155,8 @@ const potentiallyUnsafeWords = [
     "nude",
     "nudity",
     "bastard",
-    "fat"
+    "fat",
+    "shit"
 ];
 const potentiallyUnsafeWordsSpacedOut = [
     'cp',
