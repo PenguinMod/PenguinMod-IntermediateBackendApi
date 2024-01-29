@@ -2,6 +2,26 @@ const Cast = require('./Cast.js');
 const Database = require("../easy-json-database");
 // json with "includingWords", "illegalWebsites", "spacedOutWordsOnly", "potentiallyUnsafeWords", "potentiallyUnsafeWordsSpacedOut" as arrays
 const IllegalWordDB = new Database(`./illegalwords.json`);
+if (!IllegalWordDB.has("includingWords")) {
+    console.log('automoderation for "includingWords" is not set, resetting...');
+    IllegalWordDB.set("includingWords", []);
+}
+if (!IllegalWordDB.has("illegalWebsites")) {
+    console.log('automoderation for "illegalWebsites" is not set, resetting...');
+    IllegalWordDB.set("illegalWebsites", []);
+}
+if (!IllegalWordDB.has("spacedOutWordsOnly")) {
+    console.log('automoderation for "spacedOutWordsOnly" is not set, resetting...');
+    IllegalWordDB.set("spacedOutWordsOnly", []);
+}
+if (!IllegalWordDB.has("potentiallyUnsafeWords")) {
+    console.log('automoderation for "potentiallyUnsafeWords" is not set, resetting...');
+    IllegalWordDB.set("potentiallyUnsafeWords", []);
+}
+if (!IllegalWordDB.has("potentiallyUnsafeWordsSpacedOut")) {
+    console.log('automoderation for "potentiallyUnsafeWordsSpacedOut" is not set, resetting...');
+    IllegalWordDB.set("potentiallyUnsafeWordsSpacedOut", []);
+}
 
 const CheckForIllegalWording = (...args) => {
     const illegalWords = IllegalWordDB.data;
