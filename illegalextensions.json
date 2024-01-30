@@ -3,6 +3,7 @@
         "useAsWhitelist": true,
         "items": [
             "canvas",
+            "newCanvas",
             "colors",
             "tempVars",
             "iygPerlin",
@@ -61,7 +62,8 @@
             "shovellzcompresss",
             "profanityAPI",
             "tw",
-            "xeltallivclipblend"
+            "xeltallivclipblend",
+            "jgAnimation"
         ]
     },
     "url": {
