@@ -1413,13 +1413,14 @@ app.post('/api/users/followToggle', async function (req, res) {
     }
     const followers = UserManager.getFollowers(packet.target) ?? [];
     let isNowFollowing = true;
+    const wasAlreadyFollowing = UserManager.getHadFollowers(packet.target).includes(packet.username);
     if (followers.includes(packet.username)) {
         isNowFollowing = false;
         UserManager.removeFollower(packet.target, packet.username);
     } else {
         UserManager.addFollower(packet.target, packet.username);
     }
-    if (isNowFollowing && !UserManager.getHadFollowers(packet.target).includes(packet.username)) {
+    if (isNowFollowing && !wasAlreadyFollowing) {
         UserManager.addMessage(packet.target, {
             type: "followerAdded",
             name: `${packet.username}`
@@ -2169,14 +2170,6 @@ app.get('/api/projects/approve', async function (req, res) {
     if (Cast.toBoolean(project.remix)) isRemix = true;
     db.set(String(idToSetTo), project);
 
-    UserManager.notifyFollowers(project.owner, {
-        type: "upload",
-        username: project.owner,
-        content: {
-            id: project.id,
-            name: project.name
-        }
-    });
     if (isRemix) {
         if (db.has(String(project.remix))) {
             const remixedProject = db.get(String(project.remix));
@@ -3392,6 +3385,35 @@ app.post('/api/projects/publish', async function (req, res) {
     ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.title, "projectName", [id, packet.author]);
     ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.instructions, "projectInstructions", [id, packet.author]);
     ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.notes, "projectNotes", [id, packet.author]);
+
+    UserManager.notifyFollowers(packet.author, {
+        type: "upload",
+        username: packet.author,
+        content: {
+            id: id,
+            name: packet.title
+        }
+    });
+    if (packet.remix) {
+        if (db.has(String(packet.remix))) {
+            const remixedProject = db.get(String(packet.remix));
+            UserManager.addMessage(remixedProject.owner, {
+                type: "remix",
+                projectId: remixedProject.id,
+                name: `${remixedProject.name}`, // included for less API calls
+                remixId: id,
+                remixName: packet.title,
+            });
+            UserManager.addToUserFeed(remixedProject.owner, {
+                type: "remixed",
+                username: packet.author,
+                content: {
+                    id: id,
+                    name: remixedProject.name
+                }
+            });
+        }
+    }
 
     // log for approvers
     // const body = JSON.stringify({

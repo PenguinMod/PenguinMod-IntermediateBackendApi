@@ -11,10 +11,10 @@
     },
     "version": {
         "host": "local",
-        "string": "v2.5.4-legacy_intermediate",
+        "string": "v2.5.5-legacy_intermediate",
         "number": 2,
-        "numberfull": 254,
-        "start": "v2.5.4",
+        "numberfull": 255,
+        "start": "v2.5.5",
         "agent": {
             "name": "Local-Server-1"
         }

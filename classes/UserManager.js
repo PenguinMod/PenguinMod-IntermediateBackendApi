@@ -285,10 +285,12 @@ class UserManager {
         UserManager.setFollowers(username, followers);
     }
     static notifyFollowers(username, feedMessage) {
+        const db = new Database(`./userfeed.json`);
         const followers = UserManager.getFollowers(username);
         for (const follower of followers) {
-            UserManager.addToUserFeed(follower, feedMessage);
+            UserManager.addToUserFeed(follower, feedMessage, true);
         }
+        db.saveDataToFile();
     }
 
     static getUserFeed(username) {
@@ -299,22 +301,23 @@ class UserManager {
         }
         return userfeed;
     }
-    static setUserFeed(username, data) {
+    static setUserFeed(username, data, local) {
         const db = new Database(`./userfeed.json`);
         if (!Array.isArray(data)) {
             console.error("Cannot set", username, "feed to non-array");
             return;
         }
+        if (local) {
+            db.setLocal(username, data);
+            return;
+        }
         db.set(username, data);
     }
-    static addToUserFeed(username, message) {
+    static addToUserFeed(username, message, local) {
         const feed = UserManager.getUserFeed(username);
         feed.unshift(message);
         // feed is not meant to be an infinite log
-        if (feed.length > 50) {
-            feed.splice(49, feed.length - 50);
-        }
-        UserManager.setUserFeed(username, feed);
+        UserManager.setUserFeed(username, feed.slice(0, 25), local);
     }
 }
 
