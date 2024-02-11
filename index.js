@@ -3356,7 +3356,7 @@ app.get('/api/projects/search', async function (req, res) {
             return (sproject.views || 0) - (project.views || 0);
         }
         return latestValue;
-    }).filter(proj => proj.accepted === true).filter(project => {
+    }).filter(proj => (proj.accepted && !proj.hidden) === true).filter(project => {
         if (projectSearchingName) {
             const projectName = Cast.toString(project.name).toLowerCase().trim();
             const searchQueryName = Cast.toString(projectSearchingName).toLowerCase().trim();
