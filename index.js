@@ -485,7 +485,7 @@ const cacheNewStats = async () => new Promise(resolve => {
 
         const projects = db.all();
         let all = projects.length;
-        let inaccessible = 0;
+        let hidden = 0;
         let unapproved = 0;
         let featured = 0;
         let remixes = 0;
@@ -495,8 +495,8 @@ const cacheNewStats = async () => new Promise(resolve => {
             if (!project.accepted) unapproved++;
             if (project.featured) featured++;
             if (project.remix) remixes++;
-            if (!project.accepted || project.hidden) {
-                inaccessible++;
+            if (project.hidden) {
+                hidden++;
             }
         }
         for (const username of Object.keys(userDB.data)) {
@@ -507,7 +507,8 @@ const cacheNewStats = async () => new Promise(resolve => {
         lastStatAccess = Date.now();
         cachedStats = {
             all,
-            inaccessible,
+            inaccessible: hidden + unapproved,
+            hidden,
             unapproved,
             featured,
             remixes,
