@@ -2128,126 +2128,6 @@ app.post('/api/users/disputeRespond', async function (req, res) {
     res.json({ "success": true });
 });
 
-// approve uploaded projects
-app.get('/api/projects/approve', async function (req, res) {
-    const packet = req.query;
-    if (!UserManager.isCorrectCode(packet.approver, packet.passcode)) {
-        res.status(400);
-        res.header("Content-Type", 'application/json');
-        res.json({ "error": "Reauthenticate" });
-        return;
-    }
-    if (
-        !AdminAccountUsernames.get(Cast.toString(packet.approver))
-        && !ApproverUsernames.get(Cast.toString(packet.approver))
-    ) {
-        res.status(403);
-        res.header("Content-Type", 'application/json');
-        res.json({ "error": "FeatureDisabledForThisAccount" });
-        return;
-    }
-    const db = new Database(`${__dirname}/projects/published.json`);
-    if (!db.has(packet.id)) {
-        res.status(400);
-        res.header("Content-Type", 'application/json');
-        res.json({ "error": "NotFound" });
-        return;
-    }
-
-    // newMeta
-    // replace
-    let isUpdated = false;
-    let isRemix = false;
-
-    let idToSetTo = packet.id;
-    // idk if db uses a reference to the object or not
-    const project = structuredClone(db.get(Cast.toString(packet.id)));
-    if (project.updating) {
-        isUpdated = true;
-    }
-    project.updating = false;
-    project.accepted = true;
-    if (Cast.toBoolean(project.remix)) isRemix = true;
-    db.set(String(idToSetTo), project);
-
-    if (isRemix) {
-        if (db.has(String(project.remix))) {
-            const remixedProject = db.get(String(project.remix));
-            UserManager.addMessage(remixedProject.owner, {
-                type: "remix",
-                projectId: remixedProject.id,
-                name: `${remixedProject.name}`, // included for less API calls
-                remixId: project.id,
-                remixName: project.name,
-            });
-            UserManager.addToUserFeed(remixedProject.owner, {
-                type: "remixed",
-                username: remixedProject.owner,
-                content: {
-                    id: remixedProject.id,
-                    name: remixedProject.name
-                }
-            });
-        }
-    }
-    {
-        // post log
-        const projectImage = String(`https://projects.penguinmod.com/api/pmWrapper/iconUrl?id=${project.id}&rn=${Math.round(Math.random() * 9999999)}`);
-        const body = JSON.stringify({
-            content: `"${project.name}" was approved by ${packet.approver}`,
-            embeds: [{
-                title: `${project.name} was approved`,
-                color: 0x00ff00,
-                image: { url: projectImage },
-                url: "https://studio.penguinmod.com/#" + project.id,
-                fields: [
-                    {
-                        name: "Approved by",
-                        value: `${packet.approver}`
-                    }
-                ],
-                author: {
-                    name: String(project.owner).substring(0, 50),
-                    icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(project.owner).substring(0, 50)),
-                    url: String("https://penguinmod.com/profile?user=" + String(project.owner).substring(0, 50))
-                },
-                timestamp: new Date().toISOString()
-            }]
-        });
-        fetch(process.env.ApproverLogWebhook, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body
-        });
-    }
-
-    res.status(200);
-    res.header("Content-Type", 'application/json');
-    res.json({ "success": true });
-    if (Cast.toBoolean(req.query.webhook) === false) return;
-    const projectImage = String(`https://projects.penguinmod.com/api/pmWrapper/iconUrl?id=${project.id}&rn=${Math.round(Math.random() * 9999999)}`);
-    const body = JSON.stringify({
-        content: `A project was ${isUpdated ? "updated" : (isRemix ? "remixed" : "approved")}!`,
-        embeds: [{
-            title: String(project.name).substring(0, 250),
-            description: String(project.instructions + "\n\n" + project.notes).substring(0, 2040),
-            image: { url: projectImage },
-            color: (isUpdated ? 14567657 : (isRemix ? 6618880 : 41440)),
-            url: String("https://studio.penguinmod.com/#" + String(project.id)),
-            author: {
-                name: String(project.owner).substring(0, 50),
-                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(project.owner).substring(0, 50)),
-                url: String("https://penguinmod.com/profile?user=" + String(project.owner).substring(0, 50))
-            }
-        }]
-    });
-    fetch(process.env.DiscordWebhook, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body
-    });
-    // .then(res => res.text().then(t => console.log("WebhookResponse",res.status,t))).catch(err => console.log("FailedWebhookSend", err))
-});
 // reject projects
 app.post('/api/projects/reject', async function (req, res) {
     const packet = req.body;
@@ -2266,6 +2146,7 @@ app.post('/api/projects/reject', async function (req, res) {
         res.json({ "error": "FeatureDisabledForThisAccount" });
         return;
     }
+    // make sure a reason is specified
     if (typeof packet.reason !== "string") {
         res.status(400);
         res.header("Content-Type", 'application/json');
@@ -2334,6 +2215,7 @@ app.post('/api/projects/reject', async function (req, res) {
         projectData: project,
         disputable: true
     });
+    // delete from DB and delete files associated with the project
     db.delete(String(packet.id));
     const projectFilePath = `./projects/uploaded/p${packet.id}.pmp`;
     const projectImagePath = `./projects/uploadedImages/p${packet.id}.png`;
@@ -2359,6 +2241,7 @@ app.post('/api/projects/reject', async function (req, res) {
             });
         });
     });
+    // yea we good
     console.log(packet.approver, "rejected", packet.id);
     res.status(200);
     res.header("Content-Type", 'application/json');
@@ -2874,7 +2757,6 @@ app.post('/api/projects/update', async function (req, res) {
         return;
     }
     const project = db.get(String(id));
-    const projectWasApproved = project.accepted;
     if (project.owner !== packet.requestor) {
         if (!AdminAccountUsernames.get(Cast.toString(packet.requestor))) {
             res.status(403);
@@ -2947,7 +2829,6 @@ app.post('/api/projects/update', async function (req, res) {
         // if yea then do
         if (updatingProject) {
             project.accepted = true;
-            project.featured = false;
             project.updating = true;
             project.date = Date.now();
         }
@@ -3015,7 +2896,6 @@ app.post('/api/projects/update', async function (req, res) {
             });
         }
         project.accepted = true;
-        project.featured = false;
         project.updating = true;
         project.date = Date.now();
     }
@@ -3028,42 +2908,9 @@ app.post('/api/projects/update', async function (req, res) {
             });
         }
         project.accepted = true;
-        project.featured = false;
         project.updating = true;
         project.date = Date.now();
     }
-    // if project is not accepted, make a log for approvers
-    // if (projectWasApproved && !project.accepted) {
-    //     // post log
-    //     const body = JSON.stringify({
-    //         content: `"${project.name}" was updated by ${project.owner}`,
-    //         embeds: [{
-    //             title: `${project.name} was updated`,
-    //             color: 0x00bbff,
-    //             fields: [
-    //                 {
-    //                     name: "Owner",
-    //                     value: `${project.owner}`
-    //                 },
-    //                 {
-    //                     name: "ID",
-    //                     value: `${project.id}`
-    //                 }
-    //             ],
-    //             author: {
-    //                 name: String(project.owner).substring(0, 50),
-    //                 icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(project.owner).substring(0, 50)),
-    //                 url: String("https://penguinmod.com/profile?user=" + String(project.owner).substring(0, 50))
-    //             },
-    //             timestamp: new Date().toISOString()
-    //         }]
-    //     });
-    //     fetch(process.env.ApproverLogWebhook, {
-    //         method: "POST",
-    //         headers: { "Content-Type": "application/json" },
-    //         body: body
-    //     });
-    // }
     ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(newMetadata.name, "projectName", [id, packet.requestor]);
     ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(newMetadata.instructions, "projectInstructions", [id, packet.requestor]);
     ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(newMetadata.notes, "projectNotes", [id, packet.requestor]);
