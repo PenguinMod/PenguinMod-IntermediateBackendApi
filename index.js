@@ -3262,36 +3262,6 @@ app.post('/api/projects/publish', async function (req, res) {
         }
     }
 
-    // log for approvers
-    // const body = JSON.stringify({
-    //     content: `"${packet.title}" was uploaded by ${packet.author}`,
-    //     embeds: [{
-    //         title: `${packet.title} was uploaded`,
-    //         color: 0x00bbff,
-    //         fields: [
-    //             {
-    //                 name: "Owner",
-    //                 value: `${packet.author}`
-    //             },
-    //             {
-    //                 name: "ID",
-    //                 value: `${id}`
-    //             }
-    //         ],
-    //         author: {
-    //             name: String(packet.author).substring(0, 50),
-    //             icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(packet.author).substring(0, 50)),
-    //             url: String("https://penguinmod.com/profile?user=" + String(packet.author).substring(0, 50))
-    //         },
-    //         timestamp: new Date().toISOString()
-    //     }]
-    // });
-    // fetch(process.env.ApproverLogWebhook, {
-    //     method: "POST",
-    //     headers: { "Content-Type": "application/json" },
-    //     body: body
-    // });
-
     // actually say the thing!!!!!!!!!!
     res.status(200);
     res.json({ "published": id });
