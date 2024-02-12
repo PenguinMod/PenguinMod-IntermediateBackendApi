@@ -3477,16 +3477,27 @@ app.get('/api/projects/frontPage', async function (req, res) {
     res.status(200);
     res.json(returnedData);
 });
-app.get('/api/projects/uhidkbutlikeweneedtoremovealltheseunapprovedprojectsbleh', async function (req, res) {
+app.post('/api/projects/acceptAllProjects', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.username, packet.password)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return
+    }
+    if (!AdminAccountUsernames.get(Cast.toString(packet.username))) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
     const db = new Database(`${__dirname}/projects/published.json`);
 
     for (const id in db.data) {
-        const project = db.data[id]
-        project.accepted = true
+        const project = db.data[id];
+        project.accepted = true;
     }
-    db.saveDataToFile()
-    const self = fs.readFileSync('index.js')
-    fs.writeFileSync('index.js', self.replace(/\napp\.get\('\/api\/projects\/uhidkbutlikeweneedtoremovealltheseunapprovedprojectsbleh'.+}\);/gs, ''))
+    db.saveDataToFile();
 
     res.header("Content-Type", 'application/json');
     res.status(200);
