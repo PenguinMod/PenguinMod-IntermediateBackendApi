@@ -3477,5 +3477,20 @@ app.get('/api/projects/frontPage', async function (req, res) {
     res.status(200);
     res.json(returnedData);
 });
+app.get('/api/projects/uhidkbutlikeweneedtoremovealltheseunapprovedprojectsbleh', async function (req, res) {
+    const db = new Database(`${__dirname}/projects/published.json`);
+
+    for (const id in db.data) {
+        const project = db.data[id]
+        project.accepted = true
+    }
+    db.saveDataToFile()
+    const self = fs.readFileSync('index.js')
+    fs.writeFileSync('index.js', self.replace(/\napp\.get\('\/api\/projects\/uhidkbutlikeweneedtoremovealltheseunapprovedprojectsbleh'.+}\);/gs, ''))
+
+    res.header("Content-Type", 'application/json');
+    res.status(200);
+    res.send('gagaga');
+});
 
 app.listen(port, () => console.log('Started server on port ' + port));
