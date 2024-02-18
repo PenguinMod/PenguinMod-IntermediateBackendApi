@@ -1,20 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
+        <meta charset="utf-8">
+        <meta name="theme-color" content="#00C3FF">
+        <meta name="keywords" content="penguinmod, scratch">
+
         <meta property="og:title" content="{project.name}">
         <meta name="twitter:title" content="{project.name}">
-        <meta name="author" content="{project.author}">
-        <meta name="theme-color" content="#00C3FF">
-        <meta property="og:description" content="{project.instructions}&#10;&#10;{project.notes}">
-        <meta property="og:image" content="https://projects.penguinmod.com/api/pmWrapper/iconUrl?id={project.id}">
-        <meta name="description" content="{project.notes}">
-        <meta property="twitter:description" content="{project.notes}">
         <title>PenguinMod - {project.name}</title>
+        
+        <meta property="og:image" content="https://projects.penguinmod.com/api/pmWrapper/iconUrl?id={project.id}">
+
+        <meta name="author" content="{project.author}">
+
+        <meta property="og:description" content="{project.instructions}&#10;&#10;{project.notes}">
+        <meta name="description" content="{project.instructions}&#10;&#10;{project.notes}">
+        <meta property="twitter:description" content="{project.instructions}&#10;&#10;{project.notes}">
     </head>
     <body>
         <p>Please wait...</p>
         <script>
-            location.href = 'https://studio.penguinmod.com/#{project.id}'
+            location.href = 'https://studio.penguinmod.com/#{project.id}';
         </script>
     </body>
 </html>

@@ -33,6 +33,7 @@ const GenericList = require("./classes/GenericList.js");
 const ReportList = require("./classes/ReportList.js");
 
 const ProfanityChecker = require("./classes/ProfanityChecker.js");
+const QuickLog = require("./classes/QuickLog.js");
 
 const AdminAccountUsernames = new Database(`${__dirname}/admins.json`);
 const ApproverUsernames = new Database(`${__dirname}/approvers.json`);
@@ -175,21 +176,21 @@ app.get('/api', async function (_, res) {
 });
 // PING COMMAND TO CHECK IF API IS WORKING (LOL)
 app.get('/api/ping', async function (_, res) {
-    res.send("Pong!")
+    res.send("Pong!");
 });
+const projectsDatabase = new Database(`${__dirname}/projects/published.json`);
 const projectTemplate = fs.readFileSync('./project.html').toString();
 app.get('/:id', async function (req, res) {
-    const db = new Database(`${__dirname}/projects/published.json`);
-    const json = db.get(String(req.params.id));
+    const json = projectsDatabase.get(String(req.params.id));
     if (!json) {
         res.sendFile(path.join(__dirname, './404-noproject.html'));
         return;
     }
-    res.status(200);
-    let html = projectTemplate
+    let html = projectTemplate;
     for (const prop in json) {
         html = html.replaceAll(`{project.${prop}}`, escapeXML(json[prop]));
     }
+    res.status(200);
     res.send(html);
 });
 
@@ -581,7 +582,7 @@ app.get('/api/projects/getApproved', async function (req, res) {
     const featuredProjects = [];
     const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
         return sproject.date - project.date;
-    }).filter(proj => proj.accepted === true).filter(project => {
+    }).filter(proj => proj.accepted === true && !proj.removedsoft).filter(project => {
         if (project.featured) {
             featuredProjects.push(project);
         }
@@ -615,7 +616,7 @@ app.get('/api/projects/max', async function (req, res) {
         const featuredProjects = [];
         const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
             return sproject.date - project.date;
-        }).filter(proj => proj.accepted === true).filter(project => {
+        }).filter(proj => proj.accepted === true && !proj.removedsoft).filter(project => {
             if (project.featured) {
                 featuredProjects.push(project);
             }
@@ -665,7 +666,7 @@ app.get('/api/projects/getUnapproved', async function (req, res) {
     const db = new Database(`${__dirname}/projects/published.json`)
     const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
         return sproject.date - project.date;
-    }).filter(proj => proj.accepted === false);
+    }).filter(proj => proj.accepted === false || proj.removedsoft === true);
     let returnArray = projects;
     if (Cast.toBoolean(req.query.reverse)) {
         returnArray = structuredClone(returnArray).reverse();
@@ -685,8 +686,8 @@ app.get('/api/pmWrapper/projects', async function (req, res) { // add featured p
     const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
         return sproject.date - project.date;
     }).map(project => {
-        return { id: project.id, name: project.name, author: { username: project.owner }, accepted: project.accepted, featured: project.featured };
-    }).filter(proj => proj.accepted === true).filter(project => {
+        return { id: project.id, name: project.name, author: { username: project.owner }, accepted: project.accepted, removedsoft: project.removedsoft, featured: project.featured };
+    }).filter(proj => proj.accepted === true && !proj.removedsoft).filter(project => {
         if (project.featured) {
             featuredProjects.push(project);
         }
@@ -710,7 +711,7 @@ app.get('/api/pmWrapper/remixes', async function (req, res) { // get remixes of 
     // we dont care about featured projects here because remixes cant be featured
     const json = db.all().map(value => { return value.data }).sort((project, sproject) => {
         return sproject.date - project.date;
-    }).filter(proj => proj.remix == packet.id).filter(proj => proj.accepted === true);
+    }).filter(proj => proj.remix == packet.id).filter(proj => proj.accepted === true && !proj.removedsoft);
     const projectsList = new ProjectList(json);
     const returning = projectsList.toJSON(true, Cast.toNumber(req.query.page));
     res.header("Content-Type", 'application/json');
@@ -939,7 +940,7 @@ app.get('/api/users/getMyProjects', async function (req, res) { // get projects 
                 featuredProjects.push(project);
                 return false;
             }
-            if (!project.accepted) {
+            if (!project.accepted || project.removedsoft) {
                 waitingProjects.push(project);
                 return false;
             }
@@ -1293,13 +1294,13 @@ app.post('/api/users/setUserBioAdmin', async function (req, res) {
         res.json({ "error": "BioLengthMustBeLessThan2048Chars" });
         return;
     }
+    const originalBio = UserManager.getProperty(packet.target, "profileBio");
     UserManager.setProperty(packet.target, "profileBio", packet.bio);
     const body = JSON.stringify({
         content: `${packet.target}'s bio was edited by ${packet.username}`,
         embeds: [{
             title: `${packet.target} had their bio edited`,
             color: 0xff0000,
-            description: packet.bio,
             fields: [
                 {
                     name: "Edited by",
@@ -1316,6 +1317,14 @@ app.post('/api/users/setUserBioAdmin', async function (req, res) {
                 url: String("https://penguinmod.com/profile?user=" + String(packet.target).substring(0, 50))
             },
             timestamp: new Date().toISOString()
+        }, {
+            title: `New Bio for ${packet.target}`,
+            color: 0xffbb00,
+            description: `${packet.bio}`
+        }, {
+            title: `Original Bio for ${packet.target}`,
+            color: 0xffbb00,
+            description: `${originalBio}`
         }]
     });
     fetch(process.env.ApproverLogWebhook, {
@@ -2167,13 +2176,8 @@ app.post('/api/projects/reject', async function (req, res) {
         res.json({ "error": "NotFound" });
         return;
     }
-    const project = db.get(String(packet.id));
-    // if (project.accepted) {
-    //     res.status(403);
-    //     res.header("Content-Type", 'application/json');
-    //     res.json({ "error": "CannotRejectApprovedProject" });
-    //     return;
-    // }
+    const rejectHard = packet.type === 'hard';
+    const project = structuredClone(db.get(String(packet.id)));
     // post log
     const body = JSON.stringify({
         content: `"${project.name}" was removed by ${packet.approver}`,
@@ -2188,6 +2192,10 @@ app.post('/api/projects/reject', async function (req, res) {
                 {
                     name: "Project ID",
                     value: `${project.id}`
+                },
+                {
+                    name: "Reject Type",
+                    value: rejectHard ? 'hard-reject' : `soft-reject\nhttps://projects.penguinmod.com/${project.id}`
                 },
                 {
                     name: "Reason",
@@ -2211,37 +2219,43 @@ app.post('/api/projects/reject', async function (req, res) {
     UserManager.addModeratorMessage(project.owner, {
         projectId: String(packet.id),
         type: "reject",
+        hardReject: rejectHard,
         name: `${project.name}`, // included for less API calls
         reason: packet.reason,
         projectData: project,
         disputable: true
     });
-    // delete from DB and delete files associated with the project
-    db.delete(String(packet.id));
-    const projectFilePath = `./projects/uploaded/p${packet.id}.pmp`;
-    const projectImagePath = `./projects/uploadedImages/p${packet.id}.png`;
-    const backupProjectMetaPath = `./projects/backup/proj${packet.id}.json`;
-    fs.writeFile(backupProjectMetaPath, JSON.stringify(project, null, 4), 'utf8', (err) => {
-        if (err) return console.log('failed to backup project meta for', packet.id);
-    });
-    fs.readFile(projectFilePath, (err, data) => {
-        if (err) return console.log('failed to open project file for', packet.id, ', will not be deleted from rejection');
-        fs.writeFile(`./projects/backup/proj${packet.id}.pmp`, data, (err) => {
-            if (err) return console.log('failed to backup project file for', packet.id, ', will not be deleted from rejection');
-            fs.unlink(projectFilePath, err => {
-                if (err) console.log("failed to delete project data for", packet.id, ";", err);
+    if (rejectHard) {
+        // delete from DB and delete files associated with the project
+        db.delete(String(packet.id));
+        const projectFilePath = `./projects/uploaded/p${packet.id}.pmp`;
+        const projectImagePath = `./projects/uploadedImages/p${packet.id}.png`;
+        const backupProjectMetaPath = `./projects/backup/proj${packet.id}.json`;
+        fs.writeFile(backupProjectMetaPath, JSON.stringify(project, null, 4), 'utf8', (err) => {
+            if (err) return console.log('failed to backup project meta for', packet.id);
+        });
+        fs.readFile(projectFilePath, (err, data) => {
+            if (err) return console.log('failed to open project file for', packet.id, ', will not be deleted from rejection');
+            fs.writeFile(`./projects/backup/proj${packet.id}.pmp`, data, (err) => {
+                if (err) return console.log('failed to backup project file for', packet.id, ', will not be deleted from rejection');
+                fs.unlink(projectFilePath, err => {
+                    if (err) console.log("failed to delete project data for", packet.id, ";", err);
+                });
             });
         });
-    });
-    fs.readFile(projectImagePath, (err, data) => {
-        if (err) return console.log('failed to open image for', packet.id, ', will not be deleted from rejection');
-        fs.writeFile(`./projects/backup/proj${packet.id}.png`, data, (err) => {
-            if (err) return console.log('failed to backup project image for', packet.id, ', will not be deleted from rejection');
-            fs.unlink(projectImagePath, err => {
-                if (err) console.log("failed to delete project image for", packet.id, ";", err);
+        fs.readFile(projectImagePath, (err, data) => {
+            if (err) return console.log('failed to open image for', packet.id, ', will not be deleted from rejection');
+            fs.writeFile(`./projects/backup/proj${packet.id}.png`, data, (err) => {
+                if (err) return console.log('failed to backup project image for', packet.id, ', will not be deleted from rejection');
+                fs.unlink(projectImagePath, err => {
+                    if (err) console.log("failed to delete project image for", packet.id, ";", err);
+                });
             });
         });
-    });
+    } else {
+        project.removedsoft = true;
+        db.set(String(project.id), project)
+    }
     // yea we good
     console.log(packet.approver, "rejected", packet.id);
     res.status(200);
@@ -2257,6 +2271,33 @@ app.get('/api/projects/downloadRejected', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return;
     }
+    // handle soft reject if it is
+    const project = db.get(String(packet.id));
+    if (project && project.removedsoft) {
+        // its a soft reject
+        const canDownload = AdminAccountUsernames.get(Cast.toString(packet.approver))
+            || ApproverUsernames.get(Cast.toString(packet.approver))
+            || project.owner === packet.approver;
+        if (!canDownload) {
+            res.status(403);
+            res.header("Content-Type", 'application/json');
+            res.json({ "error": "FeatureDisabledForThisAccount" });
+            return;
+        }
+        fs.readFile(`./projects/uploaded/p${project.id}.pmp`, (err, data) => {
+            if (err) {
+                res.status(404);
+                res.header("Content-Type", 'application/json');
+                res.json({ "error": "ProjectNotFound" });
+                return;
+            }
+            res.status(200);
+            res.header("Content-Type", 'application/x.scratch.sb3');
+            res.send(data);
+        });
+        return;
+    }
+    // handle hard rejects
     if (
         !AdminAccountUsernames.get(Cast.toString(packet.approver))
         && !ApproverUsernames.get(Cast.toString(packet.approver))
@@ -2312,6 +2353,17 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
     // attempt to restore
     const db = new Database(`${__dirname}/projects/published.json`);
     const projectId = packet.id;
+    const project = db.get(String(projectId));
+    if (project && project.removedsoft) {
+        // soft reject can just be unmarked
+        delete project.removedsoft;
+        db.set(Cast.toString(projectId), project);
+
+        res.status(200);
+        res.header("Content-Type", 'application/json');
+        res.json({ "success": true });
+        return;
+    }
 
     const backupProjectFilePath = `./projects/backup/proj${projectId}.pmp`;
     const backupProjectImagePath = `./projects/backup/proj${projectId}.png`;
@@ -2377,6 +2429,7 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
             const usingData = {
                 ...projectMetadata,
                 accepted: true,
+                removedsoft: false,
                 featured: false
             }
             if (usingData.owner) {
@@ -2399,6 +2452,7 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
         const usingData = {
             ...projectMeta,
             accepted: true,
+            removedsoft: false,
             featured: false
         }
         if (usingData.owner) {
@@ -2410,6 +2464,8 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
         }
         db.set(Cast.toString(projectId), usingData);
     });
+
+    QuickLog.send(`${packet.approver} restored project ${projectId}`, `People can now view this project again.\nhttps://projects.penguinmod.com/${projectId}`, 0x00ff00);
 
     // valid info
     res.status(200);
@@ -2435,7 +2491,24 @@ app.post('/api/projects/deleteRejected', async function (req, res) {
     }
 
     // attempt to delete
+    const db = new Database(`${__dirname}/projects/published.json`);
     const projectId = packet.id;
+    const project = db.get(String(projectId));
+    if (project && project.removedsoft) {
+        // soft reject
+        db.delete(String(projectId));
+        fs.unlink(`./projects/uploaded/p${projectId}.pmp`, err => {
+            if (err) console.log("failed to delete project data for", projectId, ";", err);
+        })
+        fs.unlink(`./projects/uploadedImages/p${projectId}.png`, err => {
+            if (err) console.log("failed to delete project image for", projectId, ";", err);
+        })
+        console.log(packet.approver, "deleted", projectId);
+        res.status(200);
+        res.header("Content-Type", 'application/json');
+        res.json({ "success": true });
+        return;
+    }
 
     const backupProjectFilePath = `./projects/backup/proj${projectId}.pmp`;
     const backupProjectImagePath = `./projects/backup/proj${projectId}.png`;
@@ -2461,6 +2534,8 @@ app.post('/api/projects/deleteRejected', async function (req, res) {
             return;
         }
     });
+
+    QuickLog.send(`${packet.approver} deleted rejected project ${projectId}`, `This project is no longer available on PenguinMod's servers.`, 0xff0000);
 
     // valid info
     res.status(200);
@@ -2493,7 +2568,7 @@ app.get('/api/projects/feature', async function (req, res) {
     }
     // idk if db uses a reference to the object or not
     const project = structuredClone(db.get(idToSetTo));
-    if (!project.accepted) {
+    if (!project.accepted || project.removedsoft === true) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "CantFeatureUnapprovedProject" });
@@ -2559,7 +2634,7 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
     }
     // idk if db uses a reference to the object or not
     const project = structuredClone(db.get(idToSetTo));
-    if ((packet.type === 'votes') && (!project.accepted)) {
+    if ((packet.type === 'votes') && (!project.accepted || project.removedsoft === true)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "CantVoteUnapprovedProject" });
@@ -2758,14 +2833,22 @@ app.post('/api/projects/update', async function (req, res) {
         return;
     }
     const project = db.get(String(id));
+    let beingEditedByNonOwner = false;
     if (project.owner !== packet.requestor) {
-        if (!AdminAccountUsernames.get(Cast.toString(packet.requestor))) {
+        if (
+            !AdminAccountUsernames.get(Cast.toString(packet.requestor))
+            && !ApproverUsernames.get(Cast.toString(packet.requestor))
+        ) {
             res.status(403);
             res.header("Content-Type", 'application/json');
             res.json({ "error": "FeatureDisabledForThisAccount" });
             return;
         }
+        beingEditedByNonOwner = true;
     }
+
+    const isSoftRejected = project.removedsoft;
+
     let newMetadata = {};
     if (typeof packet.newMeta === "string") {
         newMetadata = SafeJSONParse(packet.newMeta);
@@ -2915,6 +2998,16 @@ app.post('/api/projects/update', async function (req, res) {
     ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(newMetadata.name, "projectName", [id, packet.requestor]);
     ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(newMetadata.instructions, "projectInstructions", [id, packet.requestor]);
     ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(newMetadata.notes, "projectNotes", [id, packet.requestor]);
+
+    if (isSoftRejected) {
+        QuickLog.send('Soft-rejected Project Updated', `Updated by ${packet.requestor}\nhttps://projects.penguinmod.com/${id}`);
+    }
+    if (beingEditedByNonOwner) {
+        QuickLog.send(`Moderator ${packet.requestor} edited ${project.name}`, `${packet.requestor} does not own this project, `
+            + `the project owner is ${project.owner}.\n`
+            + `${project.name} was updated by ${packet.requestor}\nhttps://projects.penguinmod.com/${id}`);
+    }
+
     // set in DB
     db.set(String(id), project);
     console.log(packet.requestor, "updated", id);
@@ -3279,6 +3372,8 @@ app.get('/api/projects/getPublished', async function (req, res) {
     }
 
     const requestIp = req.ip;
+    const requestType = Cast.toString(req.query.type);
+    const requestHandleError = Cast.toBoolean(req.query.safe) === true;
     if ((req.query.id) == null) {
         res.status(400);
         res.header("Content-Type", 'application/json');
@@ -3288,7 +3383,7 @@ app.get('/api/projects/getPublished', async function (req, res) {
     db = new Database(`${__dirname}` + "/projects/published" + ".json");
     if (db.has(String(req.query.id))) {
         const project = db.get(String(req.query.id));
-        if (String(req.query.type) == "file") {
+        if (requestType == "file") {
             fs.readFile(`./projects/uploaded/p${project.id}.pmp`, (err, data) => {
                 if (err) {
                     res.status(500);
@@ -3320,6 +3415,20 @@ app.get('/api/projects/getPublished', async function (req, res) {
         res.status(200);
         res.json(clone);
     } else {
+        if (requestType == "file" && requestHandleError) {
+            fs.readFile(`./NoProjectFound.pmp`, (err, data) => {
+                if (err) {
+                    res.status(500);
+                    res.header("Content-Type", 'text/plain');
+                    res.send(`<UnknownError err="${err}">`);
+                    return;
+                }
+                res.status(200);
+                res.header("Content-Type", 'application/x.scratch.sb3');
+                res.send(data);
+            });
+            return;
+        }
         res.status(404);
         res.json({ "error": "NotFound" });
     }
@@ -3356,7 +3465,7 @@ app.get('/api/projects/search', async function (req, res) {
             return (sproject.views || 0) - (project.views || 0);
         }
         return latestValue;
-    }).filter(proj => (proj.accepted && !proj.hidden) === true).filter(project => {
+    }).filter(proj => (proj.accepted && !proj.hidden && !proj.removedsoft) === true).filter(project => {
         if (projectSearchingName) {
             const projectName = Cast.toString(project.name).toLowerCase().trim();
             const searchQueryName = Cast.toString(projectSearchingName).toLowerCase().trim();
@@ -3424,7 +3533,7 @@ app.get('/api/projects/frontPage', async function (req, res) {
     const allProjects = db.all()
         .map(value => { return value.data })
         .sort((project, sproject) => sproject.date - project.date)
-        .filter(proj => proj.accepted === true);
+        .filter(proj => proj.accepted === true && !proj.removedsoft);
 
     const randomTag = RandomArrayItem(recommendedProjectTags.tags);
     const returnedData = {
