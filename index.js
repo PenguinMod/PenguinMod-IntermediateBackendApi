@@ -3586,31 +3586,5 @@ app.get('/api/projects/frontPage', async function (req, res) {
     res.status(200);
     res.json(returnedData);
 });
-app.post('/api/projects/acceptAllProjects', async function (req, res) {
-    const packet = req.body;
-    if (!UserManager.isCorrectCode(packet.username, packet.password)) {
-        res.status(400);
-        res.header("Content-Type", 'application/json');
-        res.json({ "error": "Reauthenticate" });
-        return
-    }
-    if (!AdminAccountUsernames.get(Cast.toString(packet.username))) {
-        res.status(403);
-        res.header("Content-Type", 'application/json');
-        res.json({ "error": "FeatureDisabledForThisAccount" });
-        return;
-    }
-    const db = new Database(`${__dirname}/projects/published.json`);
-
-    for (const id in db.data) {
-        const project = db.data[id];
-        project.accepted = true;
-    }
-    db.saveDataToFile();
-
-    res.header("Content-Type", 'application/json');
-    res.status(200);
-    res.send('gagaga');
-});
 
 app.listen(port, () => console.log('Started server on port ' + port));
