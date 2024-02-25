@@ -9,6 +9,22 @@ class ProjectList {
         this.pageLength = 20;
     }
 
+    static sanitizeProjectObject(obj) {
+        // clone & remove stuff that may increase network usage
+        const clone = structuredClone(obj);
+        delete clone.instructions;
+        delete clone.notes;
+        delete clone.loves;
+        delete clone.votes;
+        if (clone.owner) {
+            const badges = UserManager.getProperty(clone.owner, "badges");
+            if (badges) {
+                clone.fromDonator = badges.includes("donator");
+            }
+        }
+        return clone;
+    }
+
     /**
      * Converts this project list to JSON, with options allowed.
      * @param {boolean?} applyPagination Determines whether or not to only include the specified page.
@@ -18,21 +34,7 @@ class ProjectList {
      */
     toJSON(applyPagination, page, pageLength) {
         const json = {
-            projects: this.projects.map(project => {
-                // clone & remove stuff that may increase network usage
-                const clone = JSON.parse(JSON.stringify(project));
-                delete clone.instructions;
-                delete clone.notes;
-                delete clone.loves;
-                delete clone.votes;
-                if (clone.owner) {
-                    const badges = UserManager.getProperty(clone.owner, "badges");
-                    if (badges) {
-                        clone.fromDonator = badges.includes("donator");
-                    }
-                }
-                return clone;
-            }),
+            projects: this.projects,
             paginated: this.paginated,
             listCount: this.projects.length,
             attributes: this.extraDetails,
@@ -50,6 +52,7 @@ class ProjectList {
             const projects = json.projects;
             json.projects = projects.slice(startIdx, endIdx);
         }
+        json.projects = json.projects.map(project => ProjectList.sanitizeProjectObject(project));
         return json;
     }
     /**

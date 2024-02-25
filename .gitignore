@@ -15,6 +15,7 @@ System Volume Information
 cooldown.json
 banned.json
 users.json
+userips.json
 usermessages.json
 userdata.json
 userfeed.json
@@ -24,10 +25,13 @@ hadfollowing.json
 userreports.json
 projectreports.json
 
+admins.json
+approvers.json
+
 # Extra
 blockedips.json
 globalsettings.json
-illegalwords.js
+illegalwords.json
 cache/*
 
 # Projects

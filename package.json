@@ -1,13 +1,15 @@
 {
-  "name": "nodejs",
+  "name": "PenguinMod-IntermediateBackendAPI",
   "version": "1.0.0",
-  "description": "",
+  "description": "Backend API for PenguinMod",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js --max-old-space-size=1000",
+    "update": "git pull"
   },
   "keywords": [],
-  "author": "",
+  "author": "The PenguinMod Team",
   "license": "ISC",
   "dependencies": {
     "@types/node": "^18.0.6",
@@ -21,6 +23,7 @@
     "jimp": "^0.22.10",
     "jszip": "^3.10.1",
     "node-fetch": "^3.2.6",
+    "os-utils": "^0.0.14",
     "path": "^0.12.7"
   }
 }

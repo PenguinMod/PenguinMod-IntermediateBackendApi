@@ -1,4 +1,4 @@
-const Database = require("easy-json-database");
+const Database = require("./easy-json-database");
 const UserManager = require("./classes/UserManager.js");
 const Cast = require("./classes/Cast.js");
 
@@ -18,7 +18,7 @@ function approveProject(id) {
 
     let idToSetTo = id;
     // idk if db uses a reference to the object or not
-    const project = JSON.parse(JSON.stringify(db.get(id)));
+    const project = structuredClone(db.get(id));
     if (project.updating) { // if project is updating
         isUpdated = true;
     }
@@ -86,7 +86,7 @@ function approveAllProjects() {
     fetch(process.env.ApproverLogWebhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(JSON.parse(body))
+        body
     });
 }
 

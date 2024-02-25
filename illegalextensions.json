@@ -3,6 +3,7 @@
         "useAsWhitelist": true,
         "items": [
             "canvas",
+            "newCanvas",
             "colors",
             "tempVars",
             "iygPerlin",
@@ -13,7 +14,6 @@
             "jgDebugging",
             "jgEasySave",
             "jgInterfaces",
-            "jgJavascript",
             "jgJSON",
             "jgPathfinding",
             "jgPrism",
@@ -62,7 +62,8 @@
             "shovellzcompresss",
             "profanityAPI",
             "tw",
-            "xeltallivclipblend"
+            "xeltallivclipblend",
+            "jgAnimation"
         ]
     },
     "url": {

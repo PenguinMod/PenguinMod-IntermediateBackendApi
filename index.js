@@ -6,8 +6,9 @@ const BlockedIPs = require("./blockedips.json"); // if you are cloning this, mak
 const fs = require("fs");
 const jimp = require("jimp");
 const JSZip = require("jszip");
-const Database = require("easy-json-database");
+const Database = require("./easy-json-database");
 const Cast = require("./classes/Cast.js");
+const os = require("os-utils");
 
 const DEBUG_logAllFailedData = Cast.toBoolean(process.env.LogFailedData);
 
@@ -31,10 +32,15 @@ const ProjectList = require("./classes/ProjectList.js");
 const GenericList = require("./classes/GenericList.js");
 const ReportList = require("./classes/ReportList.js");
 
+const ProfanityChecker = require("./classes/ProfanityChecker.js");
+const QuickLog = require("./classes/QuickLog.js");
+
 const AdminAccountUsernames = new Database(`${__dirname}/admins.json`);
 const ApproverUsernames = new Database(`${__dirname}/approvers.json`);
 
 const GlobalRuntimeConfig = new Database(`${__dirname}/globalsettings.json`);
+
+const UsernameIP = new Database(`${__dirname}/userips.json`);
 
 // UserManager.setCode('debug', 'your-mom');
 
@@ -61,21 +67,10 @@ function SafeJSONParse(json) {
         return {};
     }
 }
-
-const illegalWordsList = require("./illegalwords.js"); // js file that sets module.exports to an array of banned words
-const CheckForIllegalWording = (...args) => {
-    for (const argument of args) {
-        for (const illegalWord of illegalWordsList) {
-            const checking = Cast.toString(argument)
-                .toLowerCase()
-                .replace(/[ _\-!?.#/\\,'"@$%^&*\(\)]+/gmi, '');
-            if (checking.includes(illegalWord)) {
-                return true;
-            }
-        }
-    }
-    return false;
-};
+function RandomArrayItem(arr) {
+    const rng = Math.round(Math.random() * (arr.length - 1));
+    return arr[rng];
+}
 
 function Deprecation(res, reason = "") { // if an endpoint is deprecated, use this.
     res.status(400);
@@ -86,16 +81,7 @@ function Deprecation(res, reason = "") { // if an endpoint is deprecated, use th
     });
 }
 function escapeXML(unsafe) {
-    if (typeof unsafe !== 'string') {
-        if (unsafe) {
-            // This happens when we have hacked blocks from 2.0
-            // See #1030
-            unsafe = String(unsafe);
-        } else {
-            console.error(`Unexptected type ${typeof unsafe} in xmlEscape at: ${new Error().stack}`)
-            return unsafe;
-        }
-    }
+    unsafe = String(unsafe);
     return unsafe.replace(/[<>&'"\n]/g, c => {
         switch (c) {
             case '<': return '&lt;';
@@ -158,7 +144,9 @@ app.use(bodyParser.urlencoded({
 app.use(bodyParser.json({ limit: process.env.ServerSize }));
 app.use((req, res, next) => {
     if (BlockedIPs.includes(req.ip)) return res.sendStatus(403);
-    console.log(`${req.ip}: ${req.originalUrl}`);
+    const encodedIp = Buffer.from(Cast.toString(req.ip), 'utf8').toString('hex');
+    const username = UsernameIP.get(encodedIp) || 'Unknown';
+    console.log(`${req.ip} - (${username}): ${req.originalUrl}`);
     next();
 });
 app.set('trust proxy', 1);
@@ -188,26 +176,26 @@ app.get('/api', async function (_, res) {
 });
 // PING COMMAND TO CHECK IF API IS WORKING (LOL)
 app.get('/api/ping', async function (_, res) {
-    res.send("Pong!")
+    res.send("Pong!");
 });
+const projectsDatabase = new Database(`${__dirname}/projects/published.json`);
 const projectTemplate = fs.readFileSync('./project.html').toString();
 app.get('/:id', async function (req, res) {
-    const db = new Database(`${__dirname}/projects/published.json`);
-    const json = db.get(String(req.params.id));
+    const json = projectsDatabase.get(String(req.params.id));
     if (!json) {
         res.sendFile(path.join(__dirname, './404-noproject.html'));
         return;
     }
-    res.status(200);
-    let html = projectTemplate
+    let html = projectTemplate;
     for (const prop in json) {
         html = html.replaceAll(`{project.${prop}}`, escapeXML(json[prop]));
     }
+    res.status(200);
     res.send(html);
 });
 
 // profile stuff
-const GenerateProfileJSON = (username) => {
+const GenerateProfileJSON = (username, includeBio) => {
     const rawBadges = UserManager.getProperty(username, "badges");
     const badges = Array.isArray(rawBadges) ? rawBadges : [];
     const isDonator = badges.includes('donator');
@@ -225,14 +213,28 @@ const GenerateProfileJSON = (username) => {
 
     const followers = UserManager.getFollowers(username);
 
+    let myFeaturedProject = UserManager.getProperty(username, "myFeaturedProject");
+    if (typeof myFeaturedProject !== "number") myFeaturedProject = null;
+    let myFeaturedProjectTitle = UserManager.getProperty(username, "myFeaturedProjectTitle");
+    if (typeof myFeaturedProjectTitle !== "number") myFeaturedProjectTitle = null;
+
+    const isBanned = UserManager.isBanned(username);
+    let bio = '';
+    if (!isBanned && includeBio) {
+        bio = UserManager.getProperty(username, "profileBio");
+    }
+
     return {
         username,
         admin: AdminAccountUsernames.get(username),
         approver: ApproverUsernames.get(username),
-        banned: UserManager.isBanned(username), // skipped in /profile but provided in /usernameFromCode
+        banned: isBanned, // skipped in /profile but provided in /usernameFromCode
         badges,
         donator: isDonator,
         rank,
+        bio,
+        myFeaturedProject,
+        myFeaturedProjectTitle,
         followers: followers.length,
         canrankup: canRequestRankUp && rank === 0,
         viewable: userProjects.length > 0,
@@ -241,6 +243,7 @@ const GenerateProfileJSON = (username) => {
 };
 app.get('/api/users/profile', async function (req, res) { // check if user is banned
     const username = Cast.toString(req.query.username);
+    const includeBio = Cast.toBoolean(req.query.bio);
     if (typeof username !== "string") {
         res.status(400);
         res.header("Content-Type", 'application/json');
@@ -255,7 +258,7 @@ app.get('/api/users/profile', async function (req, res) { // check if user is ba
     }
     res.status(200);
     res.header("Content-Type", 'application/json');
-    res.json(GenerateProfileJSON(username));
+    res.json(GenerateProfileJSON(username, includeBio));
 });
 app.post('/api/users/requestRankUp', async function (req, res) {
     const packet = req.body;
@@ -328,6 +331,110 @@ app.get('/api/users/assignPossition', async function (req, res) { // give someon
     res.header("Content-Type", 'application/json');
     res.json({ "success": 'AppliedStatus' });
 });
+app.get('/api/users/getProfanityList', async function (req, res) {
+    const packet = req.query;
+    if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (!AdminAccountUsernames.get(Cast.toString(packet.user))) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+    const illegalWords = ProfanityChecker.getIllegalWords();
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json(illegalWords);
+});
+app.post('/api/users/setProfanityList', async function (req, res) { // set the profanity list json
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (!AdminAccountUsernames.get(Cast.toString(packet.user))) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+    const words = packet.json;
+    if (typeof words !== 'object' || Array.isArray(words)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidData" });
+        return;
+    }
+    // check for keys
+    const keys = ["includingWords", "illegalWebsites", "spacedOutWordsOnly", "potentiallyUnsafeWords", "potentiallyUnsafeWordsSpacedOut"];
+    for (const key of keys) {
+        if (!Array.isArray(words[key])) {
+            res.status(400);
+            res.header("Content-Type", 'application/json');
+            res.json({ "error": "InvalidData" });
+            return;
+        }
+    }
+    for (const newKey in words) {
+        if (!keys.includes(newKey)) {
+            res.status(400);
+            res.header("Content-Type", 'application/json');
+            res.json({ "error": "InvalidData" });
+            return;
+        }
+    }
+    // send diff
+    const illegalWords = ProfanityChecker.getIllegalWords();
+    const diffText = ['```ansi'];
+    for (const key of keys) {
+        diffText.push(key);
+        const newList = words[key];
+        const oldList = illegalWords[key];
+        for (const word of newList) {
+            if (!oldList.includes(word)) {
+                diffText.push(`\x1b[32;1m+ ${word}\x1b[0m`);
+            }
+        }
+        for (const word of oldList) {
+            if (!newList.includes(word)) {
+                diffText.push(`\x1b[31;1m- ${word}\x1b[0m`);
+            }
+        }
+    }
+    diffText.push('```');
+    ProfanityChecker.setIllegalWords(words);
+    // send log
+    const embedText = diffText.join('\n');
+    const body = JSON.stringify({
+        content: `${packet.user} updated filtering words`,
+        embeds: [{
+            title: `Filter Words changed by ${packet.user}`,
+            color: 0x00c3ff,
+            description: embedText,
+            author: {
+                name: String(packet.user).substring(0, 50),
+                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(packet.user).substring(0, 50)),
+                url: String("https://penguinmod.com/profile?user=" + String(packet.user).substring(0, 50))
+            },
+            timestamp: new Date().toISOString()
+        }]
+    });
+    fetch(process.env.ApproverLogWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body
+    });
+    // ok yea go successepic win
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
+});
 app.get('/api/errorAllProjectRequests', async function (req, res) { // set the state of allowing or preventing all project info getting requests (only admins can use this)
     const packet = req.query;
     if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
@@ -347,6 +454,119 @@ app.get('/api/errorAllProjectRequests', async function (req, res) { // set the s
     res.header("Content-Type", 'application/json');
     res.json({ "success": 'AppliedStatus' });
 });
+app.get('/api/errorAllProjectUploads', async function (req, res) { // set the state of allowing or preventing all project uploading requests (only admins can use this)
+    const packet = req.query;
+    if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (!AdminAccountUsernames.get(Cast.toString(packet.user))) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+    GlobalRuntimeConfig.set("allowUploadProjects", Cast.toBoolean(packet.enabled));
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": 'AppliedStatus' });
+});
+let cachedStats = null;
+let lastStatAccess = Date.now();
+const tenMinutes = 10 * 60 * 1000
+const cacheNewStats = async () => new Promise(resolve => {
+    console.log('gathering data for site stats');
+    os.cpuUsage((cpuUsage) => {
+        const db = new Database(`${__dirname}/projects/published.json`);
+        const userReports = UserManager.getAllReports();
+        const reportDB = new Database(`./projectreports.json`);
+        const userDB = new Database(`./userdata.json`);
+
+        const projects = db.all();
+        let all = projects.length;
+        let hidden = 0;
+        let unapproved = 0;
+        let featured = 0;
+        let remixes = 0;
+        const users = [];
+        for (const {data: project} of projects) {
+            if (!users.includes(project.owner)) users.push(project.owner);
+            if (!project.accepted) unapproved++;
+            if (project.featured) featured++;
+            if (project.remix) remixes++;
+            if (project.hidden) {
+                hidden++;
+            }
+        }
+        for (const username of Object.keys(userDB.data)) {
+            if (!users.includes(username)) users.push(username);
+        }
+
+        console.log('caching site stats');
+        lastStatAccess = Date.now();
+        cachedStats = {
+            all,
+            inaccessible: hidden + unapproved,
+            hidden,
+            unapproved,
+            featured,
+            remixes,
+            reportedProjects: reportDB
+                .all()
+                .filter(rej => rej.exists).length,
+            reportedUsers: userReports.length,
+            users: users.length,
+            admins: AdminAccountUsernames.all().length,
+            mods: ApproverUsernames.all().length,
+            new: true,
+            nextRead: lastStatAccess + tenMinutes,
+            freeMem: os.freemem(),
+            totalMem: os.totalmem(),
+            cpuUsage: cpuUsage * 100
+        }
+        console.log('finished caching site stats');
+        resolve();
+    });
+});
+// get counts on various site things
+app.get('/api/projects/getSiteStats', async function (req, res) {
+    // force updates to only happen every five minutes
+    if (!cachedStats || Date.now() > lastStatAccess + tenMinutes) await cacheNewStats();
+
+    res.header("Content-Type", 'application/json');
+    res.status(200);
+    res.json(cachedStats);
+    cachedStats.new = false;
+});
+// returns who has perms
+// made to ensure no one has perms they shouldnt have, limited to only mods and admins
+app.get('/api/users/getSiteMods', async function (req, res) {
+    const packet = req.query;
+    if (!UserManager.isCorrectCode(packet.user, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (
+        !AdminAccountUsernames.get(Cast.toString(packet.user))
+        && !ApproverUsernames.get(Cast.toString(packet.user))
+    ) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "ThisAccountCannotAccessThisInformation" });
+        return;
+    }
+
+    res.header("Content-Type", 'application/json');
+    res.status(200);
+    res.json({
+        admins: AdminAccountUsernames.all().filter(({data}) => data).map(({key}) => key),
+        mods: ApproverUsernames.all().filter(({data}) => data).map(({key}) => key)
+    });
+});
 // get approved projects
 app.get('/api/projects/getApproved', async function (req, res) {
     if (GlobalRuntimeConfig.get("allowGetProjects") === false) {
@@ -362,7 +582,7 @@ app.get('/api/projects/getApproved', async function (req, res) {
     const featuredProjects = [];
     const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
         return sproject.date - project.date;
-    }).filter(proj => proj.accepted === true).filter(project => {
+    }).filter(proj => proj.accepted === true && !proj.removedsoft).filter(project => {
         if (project.featured) {
             featuredProjects.push(project);
         }
@@ -396,7 +616,7 @@ app.get('/api/projects/max', async function (req, res) {
         const featuredProjects = [];
         const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
             return sproject.date - project.date;
-        }).filter(proj => proj.accepted === true).filter(project => {
+        }).filter(proj => proj.accepted === true && !proj.removedsoft).filter(project => {
             if (project.featured) {
                 featuredProjects.push(project);
             }
@@ -446,7 +666,7 @@ app.get('/api/projects/getUnapproved', async function (req, res) {
     const db = new Database(`${__dirname}/projects/published.json`)
     const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
         return sproject.date - project.date;
-    }).filter(proj => proj.accepted === false);
+    }).filter(proj => proj.accepted === false || proj.removedsoft === true);
     let returnArray = projects;
     if (Cast.toBoolean(req.query.reverse)) {
         returnArray = structuredClone(returnArray).reverse();
@@ -466,8 +686,8 @@ app.get('/api/pmWrapper/projects', async function (req, res) { // add featured p
     const projects = db.all().map(value => { return value.data }).sort((project, sproject) => {
         return sproject.date - project.date;
     }).map(project => {
-        return { id: project.id, name: project.name, author: { username: project.owner }, accepted: project.accepted, featured: project.featured };
-    }).filter(proj => proj.accepted === true).filter(project => {
+        return { id: project.id, name: project.name, author: { username: project.owner }, accepted: project.accepted, removedsoft: project.removedsoft, featured: project.featured };
+    }).filter(proj => proj.accepted === true && !proj.removedsoft).filter(project => {
         if (project.featured) {
             featuredProjects.push(project);
         }
@@ -491,7 +711,7 @@ app.get('/api/pmWrapper/remixes', async function (req, res) { // get remixes of 
     // we dont care about featured projects here because remixes cant be featured
     const json = db.all().map(value => { return value.data }).sort((project, sproject) => {
         return sproject.date - project.date;
-    }).filter(proj => proj.remix == packet.id).filter(proj => proj.accepted === true);
+    }).filter(proj => proj.remix == packet.id).filter(proj => proj.accepted === true && !proj.removedsoft);
     const projectsList = new ProjectList(json);
     const returning = projectsList.toJSON(true, Cast.toNumber(req.query.page));
     res.header("Content-Type", 'application/json');
@@ -563,75 +783,98 @@ app.get('/api/pmWrapper/getProject', async function (req, res) { // get data of 
     res.json({ id: json.id, name: json.name, author: { id: -1, username: json.owner, } });
 });
 // scratch auth implementation
-app.get('/api/users/login', async function (req, res) { // login with scratch
+const generateErrorCode = (worked, verifyErr, valid, validRedir, redirect, local) => {
+    if (typeof verifyErr === 'object') {
+        try {
+            verifyErr = JSON.stringify(verifyErr);
+        } catch { // happens if we get recursion
+            verifyErr = '{}';
+        }
+    }
+    
+    const text = [];
+    text.push(worked ? 'CanVerify: true' : 'CanVerify: false');
+    text.push(valid ? 'ValidCode: true' : 'ValidCode: false');
+    text.push(validRedir ? 'ValidRedirect: true' : 'ValidRedirect: false');
+    text.push(local ? 'Local: true' : 'Local: false');
+    text.push('Redirect: ' + (redirect ? redirect : 'NO_REDIRECT'));
+    text.push('VerifyError: ' + (verifyErr ? verifyErr : 'NO_VERIFY_ERR'));
+    return text
+        .map(escapeXML) // sanitize for HTML
+        .map(text => text // sanitize for JS
+            .replaceAll('\\', '\\\\')
+            .replaceAll('`', '\\`')
+            .replaceAll('${', '$\\{')
+            .replaceAll('@', ' @ ') // remember, they'll be sending these in discord!
+        )
+        .join('<br>');
+};
+const failedLoginHTML = fs.readFileSync("./failed_login.html", "utf8");
+const handleLogin = (req, res, local) => {
     const privateCode = Cast.toString(req.query.privateCode);
+    const expectingJSON = Cast.toString(req.header("Content-Type")).endsWith('json');
     UserManager.verifyCode(privateCode).then(response => {
         // check if it is a malicious site
         // note: malicious sites cannot read the private code in the URL if it is the right redirect
         //       thank you cors, you finally did something useful
 
         // malicious APPS could, but at that point your just :trollface:d so :idk_man:
-        const invalidRedirect = response.redirect !== 'https://projects.penguinmod.com/api/users/login';
+        const invalidRedirect = local ? (
+            response.redirect !== 'https://projects.penguinmod.com/api/users/loginLocal'
+            && response.redirect !== 'http://localhost:8080/api/users/loginLocal'
+        ) : (
+            response.redirect !== 'https://projects.penguinmod.com/api/users/login'
+        );
         if ((!response.valid) || (invalidRedirect)) {
+            const errorCode = generateErrorCode(true, null, response.valid, !invalidRedirect, response.redirect, local);
             res.status(400);
-            res.header("Content-Type", 'application/json');
-            res.json({ "error": "InvalidLogin" });
+            if (expectingJSON) {
+                res.header("Content-Type", 'application/json');
+                res.json({ "error": "InvalidLogin", "code": errorCode });
+            } else {
+                res.header("Content-Type", 'text/html');
+                res.send(failedLoginHTML.replace('{{ERROR_CODE}}', errorCode));
+            }
             if (invalidRedirect) {
                 console.log(response.redirect, "tried to falsely authenticate", response.username);
             }
             return;
         }
-        // todo: we should clear the login after a couple days or so
+        // todo: maybe we should clear the login after a couple days or so?
         const username = response.username;
         UserManager.setCode(username, privateCode);
         if (!UserManager.getProperty(username, "firstLogin")) {
             UserManager.setProperty(username, "firstLogin", Date.now());
         }
+        UserManager.setProperty(username, "latestLogin", Date.now());
+        const userIP = req.ip;
+        if (userIP) {
+            // easier if the IP is the key
+            UsernameIP.set(Buffer.from(Cast.toString(userIP), 'utf8').toString('hex'), username);
+        }
         // close window by opening success.html
         res.header("Content-Type", 'text/html');
         res.status(200);
-        res.sendFile(path.join(__dirname, "./success.html"));
-    }).catch(() => {
+        res.sendFile(path.join(__dirname, 
+            local ? "./success_local.html" : "./success.html"
+        ));
+    }).catch((err) => {
+        const errorCode = generateErrorCode(false, err, false, false, null, local);
         res.status(400);
-        res.header("Content-Type", 'application/json');
-        res.json({ "error": "InvalidLogin" });
+        if (expectingJSON) {
+            res.header("Content-Type", 'application/json');
+            res.json({ "error": "InvalidLogin", "code": errorCode });
+        } else {
+            res.header("Content-Type", 'text/html');
+            res.send(failedLoginHTML.replace('{{ERROR_CODE}}', errorCode));
+        }
     });
+};
+app.get('/api/users/login', async function (req, res) { // login with scratch
+    handleLogin(req, res, false);
 });
 app.get('/api/users/loginLocal', async function (req, res) { // login with local account (like localhost)
-    const privateCode = Cast.toString(req.query.privateCode);
-    UserManager.verifyCode(privateCode).then(response => {
-        // check if it is a malicious site
-        // note: malicious sites cannot read the private code in the URL if it is the right redirect
-        //       thank you cors, you finally did something useful
-
-        // malicious APPS could, but at that point your just :trollface:d so :idk_man:
-        const invalidRedirect =
-            response.redirect !== 'https://projects.penguinmod.com/api/users/loginLocal'
-            && response.redirect !== 'http://localhost:8080/api/users/loginLocal';
-        if ((!response.valid) || (invalidRedirect)) {
-            res.status(400);
-            res.header("Content-Type", 'application/json');
-            res.json({ "error": "InvalidLogin" });
-            if (invalidRedirect) {
-                console.log(response.redirect, "tried to falsely authenticate", response.username);
-            }
-            return;
-        }
-        // todo: we should clear the login after a couple days or so
-        const username = response.username;
-        UserManager.setCode(username, privateCode);
-        if (!UserManager.getProperty(username, "firstLogin")) {
-            UserManager.setProperty(username, "firstLogin", Date.now());
-        }
-        // close window by opening success.html
-        res.header("Content-Type", 'text/html');
-        res.status(200);
-        res.sendFile(path.join(__dirname, "./success_local.html"));
-    }).catch(() => {
-        res.status(400);
-        res.header("Content-Type", 'application/json');
-        res.json({ "error": "InvalidLogin" });
-    });
+    handleLogin(req, res, true);
 });
 // logout
 app.get('/api/users/logout', (req, res) => { // logout
@@ -697,7 +940,7 @@ app.get('/api/users/getMyProjects', async function (req, res) { // get projects 
                 featuredProjects.push(project);
                 return false;
             }
-            if (!project.accepted) {
+            if (!project.accepted || project.removedsoft) {
                 waitingProjects.push(project);
                 return false;
             }
@@ -735,8 +978,8 @@ app.get('/api/users/getMessages', async function (req, res) { // get a users mes
     res.header("Content-Type", 'application/json');
     res.json(returning);
 });
-// we might not actually need this endpoint tbh
-app.post('/api/users/addMessage', async function (req, res) { // add a message to a user (you have to be the user) (by username and private code)
+// nvm, endpoint reused for "guidelines" messages
+app.post('/api/users/addMessage', async function (req, res) { // add a message to a user (by username and private code)
     const packet = req.body;
     if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
         res.status(400);
@@ -775,6 +1018,21 @@ app.post('/api/users/addMessage', async function (req, res) { // add a message t
                 type: unsafeMessage.type,
                 text: unsafeMessage.text
             });
+            break;
+        case 'guidelines':
+            if (!AdminAccountUsernames.get(username)) return notallowed();
+            if (typeof unsafeMessage.section !== "string") return invalidate();
+            const db = new Database(`./userdata.json`);
+            const usernames = db.all().map(item => item.key);
+            // use addMessage locally (see the last arg being true)
+            for (const username of usernames) {
+                UserManager.addMessage(username, {
+                    type: unsafeMessage.type,
+                    section: unsafeMessage.section
+                }, true);
+            }
+            // save local changes to the file
+            UserManager.applyMessages();
             break;
         default:
             return invalidate();
@@ -908,6 +1166,178 @@ app.post('/api/users/setBadges', async function (req, res) { // set a users badg
     });
 });
 
+// MyFeaturedProject
+// sets a project for a user to display on their profile
+app.post('/api/users/setMyFeaturedProject', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (UserManager.isBanned(packet.username)) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
+    if (typeof packet.id !== 'number') {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "IDNotSpecified" });
+        return;
+    }
+    if (packet.id < 0) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidID" });
+        return;
+    }
+    if (typeof packet.title !== 'number') {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "TitleNotSpecified" });
+        return;
+    }
+    if (packet.title < 0 || packet.title > 500) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidTitleType" });
+        return;
+    }
+    UserManager.setProperty(packet.username, "myFeaturedProject", Math.round(packet.id));
+    UserManager.setProperty(packet.username, "myFeaturedProjectTitle", Math.round(packet.title));
+
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
+});
+// About Me
+// sets text for a user to display on their profile
+app.post('/api/users/setBio', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (UserManager.isBanned(packet.username)) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
+    if (typeof packet.bio !== 'string') {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidBioInput" });
+        return;
+    }
+    if (packet.bio.length > 2048) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "BioLengthMustBeLessThan2048Chars" });
+        return;
+    }
+    if (ProfanityChecker.containsUnsafeContent(packet.bio)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "IllegalWordsUsed" });
+        ProfanityChecker.sendHeatLog(packet.bio, "profileBio", packet.username);
+        return;
+    }
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.bio, "profileBio", packet.username);
+    UserManager.setProperty(packet.username, "profileBio", packet.bio);
+
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
+});
+// (ADMIN) sets text for another user to display on their profile
+app.post('/api/users/setUserBioAdmin', async function (req, res) {
+    const packet = req.body;
+    if (!UserManager.isCorrectCode(packet.username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (
+        !AdminAccountUsernames.get(Cast.toString(packet.username))
+        && !ApproverUsernames.get(Cast.toString(packet.username))
+    ) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
+    if (!packet.target || typeof packet.target !== 'string') {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidTarget" });
+        return;
+    }
+    if (typeof packet.bio !== 'string') {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "InvalidBioInput" });
+        return;
+    }
+    if (packet.bio.length > 2048) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "BioLengthMustBeLessThan2048Chars" });
+        return;
+    }
+    const originalBio = UserManager.getProperty(packet.target, "profileBio");
+    UserManager.setProperty(packet.target, "profileBio", packet.bio);
+    const body = JSON.stringify({
+        content: `${packet.target}'s bio was edited by ${packet.username}`,
+        embeds: [{
+            title: `${packet.target} had their bio edited`,
+            color: 0xff0000,
+            fields: [
+                {
+                    name: "Edited by",
+                    value: `${packet.username}`
+                },
+                {
+                    name: "URL",
+                    value: `https://penguinmod.com/profile?user=${packet.target}`
+                },
+            ],
+            author: {
+                name: String(packet.target).substring(0, 50),
+                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(packet.target).substring(0, 50)),
+                url: String("https://penguinmod.com/profile?user=" + String(packet.target).substring(0, 50))
+            },
+            timestamp: new Date().toISOString()
+        }, {
+            title: `New Bio for ${packet.target}`,
+            color: 0xffbb00,
+            description: `${packet.bio}`
+        }, {
+            title: `Original Bio for ${packet.target}`,
+            color: 0xffbb00,
+            description: `${originalBio}`
+        }]
+    });
+    fetch(process.env.ApproverLogWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body
+    });
+
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
+});
+
 // following
 app.get('/api/users/getFollowerCount', async function (req, res) { // get a users follower count (by username)
     const packet = req.query;
@@ -993,13 +1423,14 @@ app.post('/api/users/followToggle', async function (req, res) {
     }
     const followers = UserManager.getFollowers(packet.target) ?? [];
     let isNowFollowing = true;
+    const wasAlreadyFollowing = UserManager.getHadFollowers(packet.target).includes(packet.username);
     if (followers.includes(packet.username)) {
         isNowFollowing = false;
         UserManager.removeFollower(packet.target, packet.username);
     } else {
         UserManager.addFollower(packet.target, packet.username);
     }
-    if (isNowFollowing && !UserManager.getHadFollowers(packet.target).includes(packet.username)) {
+    if (isNowFollowing && !wasAlreadyFollowing) {
         UserManager.addMessage(packet.target, {
             type: "followerAdded",
             name: `${packet.username}`
@@ -1248,6 +1679,10 @@ app.get('/api/users/report', async function (req, res) {
                 {
                     name: "Reason",
                     value: `${reportedReason}`
+                },
+                {
+                    name: "URL",
+                    value: `https://penguinmod.com/profile?user=${reportedUser}`
                 }
             ],
             author: {
@@ -1407,6 +1842,10 @@ app.get('/api/projects/report', async function (req, res) {
                 {
                     name: "Reason",
                     value: `${reportedReason}`
+                },
+                {
+                    name: "URL",
+                    value: `https://projects.penguinmod.com/${reportedProject}`
                 }
             ],
             author: {
@@ -1691,7 +2130,7 @@ app.post('/api/users/disputeRespond', async function (req, res) {
     fetch(process.env.ApproverLogWebhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(JSON.parse(body))
+        body
     });
 
     res.status(200);
@@ -1699,134 +2138,6 @@ app.post('/api/users/disputeRespond', async function (req, res) {
     res.json({ "success": true });
 });
 
-// approve uploaded projects
-app.get('/api/projects/approve', async function (req, res) {
-    const packet = req.query;
-    if (!UserManager.isCorrectCode(packet.approver, packet.passcode)) {
-        res.status(400);
-        res.header("Content-Type", 'application/json');
-        res.json({ "error": "Reauthenticate" });
-        return;
-    }
-    if (
-        !AdminAccountUsernames.get(Cast.toString(packet.approver))
-        && !ApproverUsernames.get(Cast.toString(packet.approver))
-    ) {
-        res.status(403);
-        res.header("Content-Type", 'application/json');
-        res.json({ "error": "FeatureDisabledForThisAccount" });
-        return;
-    }
-    const db = new Database(`${__dirname}/projects/published.json`);
-    if (!db.has(packet.id)) {
-        res.status(400);
-        res.header("Content-Type", 'application/json');
-        res.json({ "error": "NotFound" });
-        return;
-    }
-
-    // newMeta
-    // replace
-    let isUpdated = false;
-    let isRemix = false;
-
-    let idToSetTo = packet.id;
-    // idk if db uses a reference to the object or not
-    const project = JSON.parse(JSON.stringify(db.get(Cast.toString(packet.id))));
-    if (project.updating) {
-        isUpdated = true;
-    }
-    project.updating = false;
-    project.accepted = true;
-    if (Cast.toBoolean(project.remix)) isRemix = true;
-    db.set(String(idToSetTo), project);
-
-    UserManager.notifyFollowers(project.owner, {
-        type: "upload",
-        username: project.owner,
-        content: {
-            id: project.id,
-            name: project.name
-        }
-    });
-    if (isRemix) {
-        if (db.has(String(project.remix))) {
-            const remixedProject = db.get(String(project.remix));
-            UserManager.addMessage(remixedProject.owner, {
-                type: "remix",
-                projectId: remixedProject.id,
-                name: `${remixedProject.name}`, // included for less API calls
-                remixId: project.id,
-                remixName: project.name,
-            });
-            UserManager.addToUserFeed(remixedProject.owner, {
-                type: "remixed",
-                username: remixedProject.owner,
-                content: {
-                    id: remixedProject.id,
-                    name: remixedProject.name
-                }
-            });
-        }
-    }
-    {
-        // post log
-        const projectImage = String(`https://projects.penguinmod.com/api/pmWrapper/iconUrl?id=${project.id}&rn=${Math.round(Math.random() * 9999999)}`);
-        const body = JSON.stringify({
-            content: `"${project.name}" was approved by ${packet.approver}`,
-            embeds: [{
-                title: `${project.name} was approved`,
-                color: 0x00ff00,
-                image: { url: projectImage },
-                url: "https://studio.penguinmod.com/#" + project.id,
-                fields: [
-                    {
-                        name: "Approved by",
-                        value: `${packet.approver}`
-                    }
-                ],
-                author: {
-                    name: String(project.owner).substring(0, 50),
-                    icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(project.owner).substring(0, 50)),
-                    url: String("https://penguinmod.com/profile?user=" + String(project.owner).substring(0, 50))
-                },
-                timestamp: new Date().toISOString()
-            }]
-        });
-        fetch(process.env.ApproverLogWebhook, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(JSON.parse(body))
-        });
-    }
-
-    res.status(200);
-    res.header("Content-Type", 'application/json');
-    res.json({ "success": true });
-    if (Cast.toBoolean(req.query.webhook) === false) return;
-    const projectImage = String(`https://projects.penguinmod.com/api/pmWrapper/iconUrl?id=${project.id}&rn=${Math.round(Math.random() * 9999999)}`);
-    const body = JSON.stringify({
-        content: `A project was ${isUpdated ? "updated" : (isRemix ? "remixed" : "approved")}!`,
-        embeds: [{
-            title: String(project.name).substring(0, 250),
-            description: String(project.instructions + "\n\n" + project.notes).substring(0, 2040),
-            image: { url: projectImage },
-            color: (isUpdated ? 14567657 : (isRemix ? 6618880 : 41440)),
-            url: String("https://studio.penguinmod.com/#" + String(project.id)),
-            author: {
-                name: String(project.owner).substring(0, 50),
-                icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(project.owner).substring(0, 50)),
-                url: String("https://penguinmod.com/profile?user=" + String(project.owner).substring(0, 50))
-            }
-        }]
-    });
-    fetch(process.env.DiscordWebhook, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(JSON.parse(body))
-    });
-    // .then(res => res.text().then(t => console.log("WebhookResponse",res.status,t))).catch(err => console.log("FailedWebhookSend", err))
-});
 // reject projects
 app.post('/api/projects/reject', async function (req, res) {
     const packet = req.body;
@@ -1845,6 +2156,7 @@ app.post('/api/projects/reject', async function (req, res) {
         res.json({ "error": "FeatureDisabledForThisAccount" });
         return;
     }
+    // make sure a reason is specified
     if (typeof packet.reason !== "string") {
         res.status(400);
         res.header("Content-Type", 'application/json');
@@ -1864,27 +2176,26 @@ app.post('/api/projects/reject', async function (req, res) {
         res.json({ "error": "NotFound" });
         return;
     }
-    const project = db.get(String(packet.id));
-    // if (project.accepted) {
-    //     res.status(403);
-    //     res.header("Content-Type", 'application/json');
-    //     res.json({ "error": "CannotRejectApprovedProject" });
-    //     return;
-    // }
+    const rejectHard = packet.type === 'hard';
+    const project = structuredClone(db.get(String(packet.id)));
     // post log
     const body = JSON.stringify({
-        content: `"${project.name}" was rejected by ${packet.approver}`,
+        content: `"${project.name}" was removed by ${packet.approver}`,
         embeds: [{
-            title: `${project.name} was rejected`,
+            title: `${project.name} was removed`,
             color: 0xff0000,
             fields: [
                 {
-                    name: "Rejected by",
+                    name: "Removed by",
                     value: `${packet.approver}`
                 },
                 {
                     name: "Project ID",
                     value: `${project.id}`
+                },
+                {
+                    name: "Reject Type",
+                    value: rejectHard ? 'hard-reject' : `soft-reject\nhttps://projects.penguinmod.com/${project.id}`
                 },
                 {
                     name: "Reason",
@@ -1902,42 +2213,50 @@ app.post('/api/projects/reject', async function (req, res) {
     fetch(process.env.ApproverLogWebhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(JSON.parse(body))
+        body
     });
     // add message
     UserManager.addModeratorMessage(project.owner, {
         projectId: String(packet.id),
         type: "reject",
+        hardReject: rejectHard,
         name: `${project.name}`, // included for less API calls
         reason: packet.reason,
         projectData: project,
         disputable: true
     });
-    db.delete(String(packet.id));
-    const projectFilePath = `./projects/uploaded/p${packet.id}.pmp`;
-    const projectImagePath = `./projects/uploadedImages/p${packet.id}.png`;
-    const backupProjectMetaPath = `./projects/backup/proj${packet.id}.json`;
-    fs.writeFile(backupProjectMetaPath, JSON.stringify(project, null, 4), 'utf8', (err) => {
-        if (err) return console.log('failed to backup project meta for', packet.id);
-    });
-    fs.readFile(projectFilePath, (err, data) => {
-        if (err) return console.log('failed to open project file for', packet.id, ', will not be deleted from rejection');
-        fs.writeFile(`./projects/backup/proj${packet.id}.pmp`, data, (err) => {
-            if (err) return console.log('failed to backup project file for', packet.id, ', will not be deleted from rejection');
-            fs.unlink(projectFilePath, err => {
-                if (err) console.log("failed to delete project data for", packet.id, ";", err);
+    if (rejectHard) {
+        // delete from DB and delete files associated with the project
+        db.delete(String(packet.id));
+        const projectFilePath = `./projects/uploaded/p${packet.id}.pmp`;
+        const projectImagePath = `./projects/uploadedImages/p${packet.id}.png`;
+        const backupProjectMetaPath = `./projects/backup/proj${packet.id}.json`;
+        fs.writeFile(backupProjectMetaPath, JSON.stringify(project, null, 4), 'utf8', (err) => {
+            if (err) return console.log('failed to backup project meta for', packet.id);
+        });
+        fs.readFile(projectFilePath, (err, data) => {
+            if (err) return console.log('failed to open project file for', packet.id, ', will not be deleted from rejection');
+            fs.writeFile(`./projects/backup/proj${packet.id}.pmp`, data, (err) => {
+                if (err) return console.log('failed to backup project file for', packet.id, ', will not be deleted from rejection');
+                fs.unlink(projectFilePath, err => {
+                    if (err) console.log("failed to delete project data for", packet.id, ";", err);
+                });
             });
         });
-    });
-    fs.readFile(projectImagePath, (err, data) => {
-        if (err) return console.log('failed to open image for', packet.id, ', will not be deleted from rejection');
-        fs.writeFile(`./projects/backup/proj${packet.id}.png`, data, (err) => {
-            if (err) return console.log('failed to backup project image for', packet.id, ', will not be deleted from rejection');
-            fs.unlink(projectImagePath, err => {
-                if (err) console.log("failed to delete project image for", packet.id, ";", err);
+        fs.readFile(projectImagePath, (err, data) => {
+            if (err) return console.log('failed to open image for', packet.id, ', will not be deleted from rejection');
+            fs.writeFile(`./projects/backup/proj${packet.id}.png`, data, (err) => {
+                if (err) return console.log('failed to backup project image for', packet.id, ', will not be deleted from rejection');
+                fs.unlink(projectImagePath, err => {
+                    if (err) console.log("failed to delete project image for", packet.id, ";", err);
+                });
             });
         });
-    });
+    } else {
+        project.removedsoft = true;
+        db.set(String(project.id), project)
+    }
+    // yea we good
     console.log(packet.approver, "rejected", packet.id);
     res.status(200);
     res.header("Content-Type", 'application/json');
@@ -1952,6 +2271,33 @@ app.get('/api/projects/downloadRejected', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return;
     }
+    // handle soft reject if it is
+    const project = db.get(String(packet.id));
+    if (project && project.removedsoft) {
+        // its a soft reject
+        const canDownload = AdminAccountUsernames.get(Cast.toString(packet.approver))
+            || ApproverUsernames.get(Cast.toString(packet.approver))
+            || project.owner === packet.approver;
+        if (!canDownload) {
+            res.status(403);
+            res.header("Content-Type", 'application/json');
+            res.json({ "error": "FeatureDisabledForThisAccount" });
+            return;
+        }
+        fs.readFile(`./projects/uploaded/p${project.id}.pmp`, (err, data) => {
+            if (err) {
+                res.status(404);
+                res.header("Content-Type", 'application/json');
+                res.json({ "error": "ProjectNotFound" });
+                return;
+            }
+            res.status(200);
+            res.header("Content-Type", 'application/x.scratch.sb3');
+            res.send(data);
+        });
+        return;
+    }
+    // handle hard rejects
     if (
         !AdminAccountUsernames.get(Cast.toString(packet.approver))
         && !ApproverUsernames.get(Cast.toString(packet.approver))
@@ -2007,6 +2353,17 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
     // attempt to restore
     const db = new Database(`${__dirname}/projects/published.json`);
     const projectId = packet.id;
+    const project = db.get(String(projectId));
+    if (project && project.removedsoft) {
+        // soft reject can just be unmarked
+        delete project.removedsoft;
+        db.set(Cast.toString(projectId), project);
+
+        res.status(200);
+        res.header("Content-Type", 'application/json');
+        res.json({ "success": true });
+        return;
+    }
 
     const backupProjectFilePath = `./projects/backup/proj${projectId}.pmp`;
     const backupProjectImagePath = `./projects/backup/proj${projectId}.png`;
@@ -2072,6 +2429,7 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
             const usingData = {
                 ...projectMetadata,
                 accepted: true,
+                removedsoft: false,
                 featured: false
             }
             if (usingData.owner) {
@@ -2094,6 +2452,7 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
         const usingData = {
             ...projectMeta,
             accepted: true,
+            removedsoft: false,
             featured: false
         }
         if (usingData.owner) {
@@ -2105,6 +2464,8 @@ app.post('/api/projects/restoreRejected', async function (req, res) {
         }
         db.set(Cast.toString(projectId), usingData);
     });
+
+    QuickLog.send(`${packet.approver} restored project ${projectId}`, `People can now view this project again.\nhttps://projects.penguinmod.com/${projectId}`, 0x00ff00);
 
     // valid info
     res.status(200);
@@ -2130,7 +2491,24 @@ app.post('/api/projects/deleteRejected', async function (req, res) {
     }
 
     // attempt to delete
+    const db = new Database(`${__dirname}/projects/published.json`);
     const projectId = packet.id;
+    const project = db.get(String(projectId));
+    if (project && project.removedsoft) {
+        // soft reject
+        db.delete(String(projectId));
+        fs.unlink(`./projects/uploaded/p${projectId}.pmp`, err => {
+            if (err) console.log("failed to delete project data for", projectId, ";", err);
+        })
+        fs.unlink(`./projects/uploadedImages/p${projectId}.png`, err => {
+            if (err) console.log("failed to delete project image for", projectId, ";", err);
+        })
+        console.log(packet.approver, "deleted", projectId);
+        res.status(200);
+        res.header("Content-Type", 'application/json');
+        res.json({ "success": true });
+        return;
+    }
 
     const backupProjectFilePath = `./projects/backup/proj${projectId}.pmp`;
     const backupProjectImagePath = `./projects/backup/proj${projectId}.png`;
@@ -2156,6 +2534,8 @@ app.post('/api/projects/deleteRejected', async function (req, res) {
             return;
         }
     });
+
+    QuickLog.send(`${packet.approver} deleted rejected project ${projectId}`, `This project is no longer available on PenguinMod's servers.`, 0xff0000);
 
     // valid info
     res.status(200);
@@ -2187,8 +2567,8 @@ app.get('/api/projects/feature', async function (req, res) {
         return;
     }
     // idk if db uses a reference to the object or not
-    const project = JSON.parse(JSON.stringify(db.get(idToSetTo)));
-    if (!project.accepted) {
+    const project = structuredClone(db.get(idToSetTo));
+    if (!project.accepted || project.removedsoft === true) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "CantFeatureUnapprovedProject" });
@@ -2230,7 +2610,7 @@ app.get('/api/projects/feature', async function (req, res) {
     fetch(process.env.DiscordWebhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(JSON.parse(body))
+        body
     });
     // .then(res => res.text().then(t => console.log("WebhookResponse",res.status,t))).catch(err => console.log("FailedWebhookSend", err))
 });
@@ -2254,7 +2634,7 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
     }
     // idk if db uses a reference to the object or not
     const project = structuredClone(db.get(idToSetTo));
-    if ((packet.type === 'votes') && (!project.accepted)) {
+    if ((packet.type === 'votes') && (!project.accepted || project.removedsoft === true)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "CantVoteUnapprovedProject" });
@@ -2341,7 +2721,7 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
             fetch(process.env.DiscordWebhook, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(JSON.parse(body))
+                body
             });
         }
     }
@@ -2368,7 +2748,7 @@ app.get('/api/projects/getProjectVote', async function (req, res) {
         return;
     }
     // idk if db uses a reference to the object or not
-    const project = JSON.parse(JSON.stringify(db.get(idToSetTo)));
+    const project = structuredClone(db.get(idToSetTo));
     if (!Array.isArray(project.loves)) {
         project.loves = [];
     }
@@ -2422,13 +2802,18 @@ app.get('/api/projects/delete', async function (req, res) {
     res.json({ "success": true });
 });
 // update uploaded projects
-// todo: replace /approve's newMeta stuff with this endpoint?
 app.post('/api/projects/update', async function (req, res) {
     const packet = req.body;
     if (!UserManager.isCorrectCode(packet.requestor, packet.passcode)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (GlobalRuntimeConfig.get("allowUploadProjects") === false && (!AdminAccountUsernames.get(Cast.toString(packet.requestor)))) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "PublishDisabled" });
         return;
     }
 
@@ -2448,24 +2833,32 @@ app.post('/api/projects/update', async function (req, res) {
         return;
     }
     const project = db.get(String(id));
-    const projectWasApproved = project.accepted;
+    let beingEditedByNonOwner = false;
     if (project.owner !== packet.requestor) {
-        if (!AdminAccountUsernames.get(Cast.toString(packet.requestor))) {
+        if (
+            !AdminAccountUsernames.get(Cast.toString(packet.requestor))
+            && !ApproverUsernames.get(Cast.toString(packet.requestor))
+        ) {
             res.status(403);
             res.header("Content-Type", 'application/json');
             res.json({ "error": "FeatureDisabledForThisAccount" });
             return;
         }
+        beingEditedByNonOwner = true;
     }
+
+    const isSoftRejected = project.removedsoft;
+
+    let newMetadata = {};
     if (typeof packet.newMeta === "string") {
-        const newMetadata = SafeJSONParse(packet.newMeta);
+        newMetadata = SafeJSONParse(packet.newMeta);
         let updatingProject = false;
         if (typeof newMetadata.name === "string") {
-            project.name = newMetadata.name;
-            if (CheckForIllegalWording(newMetadata.name)) {
+            if (ProfanityChecker.containsUnsafeContent(newMetadata.name)) {
                 res.status(400);
                 res.header("Content-Type", 'application/json');
                 res.json({ "error": "IllegalWordsUsed" });
+                ProfanityChecker.sendHeatLog(newMetadata.name, "projectName", [id, packet.requestor]);
                 if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
                 return;
             }
@@ -2476,14 +2869,15 @@ app.post('/api/projects/update', async function (req, res) {
                 if (DEBUG_logAllFailedData) console.log("Title3-50Chars", packet);
                 return;
             }
+            project.name = newMetadata.name;
             updatingProject = true;
         }
         if (typeof newMetadata.instructions === "string") {
-            project.instructions = newMetadata.instructions;
-            if (CheckForIllegalWording(newMetadata.instructions)) {
+            if (ProfanityChecker.containsUnsafeContent(newMetadata.instructions)) {
                 res.status(400);
                 res.header("Content-Type", 'application/json');
                 res.json({ "error": "IllegalWordsUsed" });
+                ProfanityChecker.sendHeatLog(newMetadata.instructions, "projectInstructions", [id, packet.requestor]);
                 if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
                 return;
             }
@@ -2494,14 +2888,15 @@ app.post('/api/projects/update', async function (req, res) {
                 if (DEBUG_logAllFailedData) console.log("Instructions4096Longer", packet);
                 return;
             }
+            project.instructions = newMetadata.instructions;
             updatingProject = true;
         }
         if (typeof newMetadata.notes === "string") {
-            project.notes = newMetadata.notes;
-            if (CheckForIllegalWording(newMetadata.notes)) {
+            if (ProfanityChecker.containsUnsafeContent(newMetadata.notes)) {
                 res.status(400);
                 res.header("Content-Type", 'application/json');
                 res.json({ "error": "IllegalWordsUsed" });
+                ProfanityChecker.sendHeatLog(newMetadata.notes, "projectNotes", [id, packet.requestor]);
                 if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
                 return;
             }
@@ -2512,12 +2907,12 @@ app.post('/api/projects/update', async function (req, res) {
                 if (DEBUG_logAllFailedData) console.log("Notes4096Longer", packet);
                 return;
             }
+            project.notes = newMetadata.notes;
             updatingProject = true;
         }
         // if yea then do
         if (updatingProject) {
             project.accepted = true;
-            project.featured = false;
             project.updating = true;
             project.date = Date.now();
         }
@@ -2585,7 +2980,6 @@ app.post('/api/projects/update', async function (req, res) {
             });
         }
         project.accepted = true;
-        project.featured = false;
         project.updating = true;
         project.date = Date.now();
     }
@@ -2598,42 +2992,22 @@ app.post('/api/projects/update', async function (req, res) {
             });
         }
         project.accepted = true;
-        project.featured = false;
         project.updating = true;
         project.date = Date.now();
     }
-    // if project is not accepted, make a log for approvers
-    // if (projectWasApproved && !project.accepted) {
-    //     // post log
-    //     const body = JSON.stringify({
-    //         content: `"${project.name}" was updated by ${project.owner}`,
-    //         embeds: [{
-    //             title: `${project.name} was updated`,
-    //             color: 0x00bbff,
-    //             fields: [
-    //                 {
-    //                     name: "Owner",
-    //                     value: `${project.owner}`
-    //                 },
-    //                 {
-    //                     name: "ID",
-    //                     value: `${project.id}`
-    //                 }
-    //             ],
-    //             author: {
-    //                 name: String(project.owner).substring(0, 50),
-    //                 icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(project.owner).substring(0, 50)),
-    //                 url: String("https://penguinmod.com/profile?user=" + String(project.owner).substring(0, 50))
-    //             },
-    //             timestamp: new Date().toISOString()
-    //         }]
-    //     });
-    //     fetch(process.env.ApproverLogWebhook, {
-    //         method: "POST",
-    //         headers: { "Content-Type": "application/json" },
-    //         body: body
-    //     });
-    // }
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(newMetadata.name, "projectName", [id, packet.requestor]);
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(newMetadata.instructions, "projectInstructions", [id, packet.requestor]);
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(newMetadata.notes, "projectNotes", [id, packet.requestor]);
+
+    if (isSoftRejected) {
+        QuickLog.send('Soft-rejected Project Updated', `Updated by ${packet.requestor}\nhttps://projects.penguinmod.com/${id}`);
+    }
+    if (beingEditedByNonOwner) {
+        QuickLog.send(`Moderator ${packet.requestor} edited ${project.name}`, `${packet.requestor} does not own this project, `
+            + `the project owner is ${project.owner}.\n`
+            + `${project.name} was updated by ${packet.requestor}\nhttps://projects.penguinmod.com/${id}`);
+    }
+
     // set in DB
     db.set(String(id), project);
     console.log(packet.requestor, "updated", id);
@@ -2642,10 +3016,9 @@ app.post('/api/projects/update', async function (req, res) {
     res.json({ "success": true });
 });
 // upload project to the main page
-const UploadsDisabled = Cast.toBoolean(process.env.UploadsDisabled);
 app.post('/api/projects/publish', async function (req, res) {
     const packet = req.body;
-    if (UploadsDisabled && (!AdminAccountUsernames.get(Cast.toString(packet.author)))) {
+    if (GlobalRuntimeConfig.get("allowUploadProjects") === false && (!AdminAccountUsernames.get(Cast.toString(packet.author)))) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "PublishDisabled" });
@@ -2764,24 +3137,27 @@ app.post('/api/projects/publish', async function (req, res) {
         return;
     }
 
-    if (CheckForIllegalWording(packet.title)) {
+    if (ProfanityChecker.containsUnsafeContent(packet.title)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "IllegalWordsUsed" });
+        ProfanityChecker.sendHeatLog(packet.title, "projectName", packet.author);
         if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
         return;
     }
-    if (packet.instructions && CheckForIllegalWording(packet.instructions)) {
+    if (packet.instructions && ProfanityChecker.containsUnsafeContent(packet.instructions)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "IllegalWordsUsed" });
+        ProfanityChecker.sendHeatLog(packet.instructions, "projectInstructions", packet.author);
         if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
         return;
     }
-    if (packet.notes && CheckForIllegalWording(packet.notes)) {
+    if (packet.notes && ProfanityChecker.containsUnsafeContent(packet.notes)) {
         res.status(400);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "IllegalWordsUsed" });
+        ProfanityChecker.sendHeatLog(packet.notes, "projectNotes", packet.author);
         if (DEBUG_logAllFailedData) console.log("IllegalWordsUsed", packet);
         return;
     }
@@ -2947,35 +3323,38 @@ app.post('/api/projects/publish', async function (req, res) {
         restrictions: packet.restrictions, // array of restrictions on this project (ex: blood, flashing lights)
     });
 
-    // log for approvers
-    // const body = JSON.stringify({
-    //     content: `"${packet.title}" was uploaded by ${packet.author}`,
-    //     embeds: [{
-    //         title: `${packet.title} was uploaded`,
-    //         color: 0x00bbff,
-    //         fields: [
-    //             {
-    //                 name: "Owner",
-    //                 value: `${packet.author}`
-    //             },
-    //             {
-    //                 name: "ID",
-    //                 value: `${id}`
-    //             }
-    //         ],
-    //         author: {
-    //             name: String(packet.author).substring(0, 50),
-    //             icon_url: String("https://trampoline.turbowarp.org/avatars/by-username/" + String(packet.author).substring(0, 50)),
-    //             url: String("https://penguinmod.com/profile?user=" + String(packet.author).substring(0, 50))
-    //         },
-    //         timestamp: new Date().toISOString()
-    //     }]
-    // });
-    // fetch(process.env.ApproverLogWebhook, {
-    //     method: "POST",
-    //     headers: { "Content-Type": "application/json" },
-    //     body: body
-    // });
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.title, "projectName", [id, packet.author]);
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.instructions, "projectInstructions", [id, packet.author]);
+    ProfanityChecker.checkAndWarnPotentiallyUnsafeContent(packet.notes, "projectNotes", [id, packet.author]);
+
+    UserManager.notifyFollowers(packet.author, {
+        type: "upload",
+        username: packet.author,
+        content: {
+            id: id,
+            name: packet.title
+        }
+    });
+    if (packet.remix) {
+        if (db.has(String(packet.remix))) {
+            const remixedProject = db.get(String(packet.remix));
+            UserManager.addMessage(remixedProject.owner, {
+                type: "remix",
+                projectId: remixedProject.id,
+                name: `${remixedProject.name}`, // included for less API calls
+                remixId: id,
+                remixName: packet.title,
+            });
+            UserManager.addToUserFeed(remixedProject.owner, {
+                type: "remixed",
+                username: packet.author,
+                content: {
+                    id: id,
+                    name: remixedProject.name
+                }
+            });
+        }
+    }
 
     // actually say the thing!!!!!!!!!!
     res.status(200);
@@ -2993,6 +3372,8 @@ app.get('/api/projects/getPublished', async function (req, res) {
     }
 
     const requestIp = req.ip;
+    const requestType = Cast.toString(req.query.type);
+    const requestHandleError = Cast.toBoolean(req.query.safe) === true;
     if ((req.query.id) == null) {
         res.status(400);
         res.header("Content-Type", 'application/json');
@@ -3002,7 +3383,7 @@ app.get('/api/projects/getPublished', async function (req, res) {
     db = new Database(`${__dirname}` + "/projects/published" + ".json");
     if (db.has(String(req.query.id))) {
         const project = db.get(String(req.query.id));
-        if (String(req.query.type) == "file") {
+        if (requestType == "file") {
             fs.readFile(`./projects/uploaded/p${project.id}.pmp`, (err, data) => {
                 if (err) {
                     res.status(500);
@@ -3034,6 +3415,20 @@ app.get('/api/projects/getPublished', async function (req, res) {
         res.status(200);
         res.json(clone);
     } else {
+        if (requestType == "file" && requestHandleError) {
+            fs.readFile(`./NoProjectFound.pmp`, (err, data) => {
+                if (err) {
+                    res.status(500);
+                    res.header("Content-Type", 'text/plain');
+                    res.send(`<UnknownError err="${err}">`);
+                    return;
+                }
+                res.status(200);
+                res.header("Content-Type", 'application/x.scratch.sb3');
+                res.send(data);
+            });
+            return;
+        }
         res.status(404);
         res.json({ "error": "NotFound" });
     }
@@ -3052,6 +3447,7 @@ app.get('/api/projects/search', async function (req, res) {
     const projectOwnerRequired = req.query.user;
     const projectSearchingName = req.query.includes;
     const mustBeFeatured = req.query.featured;
+    const shouldReturnRandomProject = Cast.toBoolean(req.query.random);
     const sortingBy = Cast.toString(req.query.sortby);
 
     // add featured projects first but also sort them by date
@@ -3069,7 +3465,7 @@ app.get('/api/projects/search', async function (req, res) {
             return (sproject.views || 0) - (project.views || 0);
         }
         return latestValue;
-    }).filter(proj => proj.accepted === true).filter(project => {
+    }).filter(proj => (proj.accepted && !proj.hidden && !proj.removedsoft) === true).filter(project => {
         if (projectSearchingName) {
             const projectName = Cast.toString(project.name).toLowerCase().trim();
             const searchQueryName = Cast.toString(projectSearchingName).toLowerCase().trim();
@@ -3103,6 +3499,14 @@ app.get('/api/projects/search', async function (req, res) {
     // we set the array to featuredProjectsArray.concat(array) instead of array.concat(featuredProjectsArray)
     // because otherwise the featured projects would be after the normal projects
     const returnArray = featuredProjects.concat(projects);
+    if (shouldReturnRandomProject === true) {
+        // return a random project in this array
+        const project = RandomArrayItem(returnArray);
+        res.header("Content-Type", 'application/json');
+        res.status(200);
+        res.json(project ? {"id": project.id} : {"error": "NoProjectsFound"});
+        return;
+    }
     // make project list
     // new ProjectList() with .toJSON will automatically cut the pages for us
     const projectsList = new ProjectList(returnArray);
@@ -3110,6 +3514,77 @@ app.get('/api/projects/search', async function (req, res) {
     res.header("Content-Type", 'application/json');
     res.status(200);
     res.json(returning);
+});
+const recommendedProjectTags = require("./projecttags.json");
+app.get('/api/projects/frontPage', async function (req, res) {
+    if (GlobalRuntimeConfig.get("allowGetProjects") === false) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
+    const db = new Database(`${__dirname}/projects/published.json`);
+
+    // get the list of all projects
+    /**
+     * @type {Array<object>}
+     */
+    const allProjects = db.all()
+        .map(value => { return value.data })
+        .sort((project, sproject) => sproject.date - project.date)
+        .filter(proj => proj.accepted === true && !proj.removedsoft);
+
+    const randomTag = RandomArrayItem(recommendedProjectTags.tags);
+    const returnedData = {
+        featured: [],
+        voted: [],
+        liked: [],
+        viewed: [],
+        latest: [],
+        tagged: [],
+        selectedTag: randomTag
+    };
+
+    // start filling this out
+    returnedData.featured = allProjects
+        .filter(proj => proj.featured)
+        .slice(0, 15)
+        .map(proj => ProjectList.sanitizeProjectObject(proj));
+    returnedData.voted = allProjects
+        .filter(proj => !proj.featured)
+        .filter(proj => proj.votes && proj.votes.length > 5) // too low to appear here
+        .sort((project, sproject) => sproject.votes.length - project.votes.length)
+        .slice(0, 15)
+        .map(proj => ProjectList.sanitizeProjectObject(proj));
+    returnedData.liked = allProjects
+        .filter(proj => !proj.featured)
+        .filter(proj => proj.loves && proj.loves.length > 5) // too low to appear here
+        .sort((project, sproject) => sproject.loves.length - project.loves.length)
+        .slice(0, 15)
+        .map(proj => ProjectList.sanitizeProjectObject(proj));
+    returnedData.viewed = allProjects
+        .filter(proj => !proj.featured)
+        .filter(proj => proj.views && proj.views > 30) // too low to appear here
+        .sort((project, sproject) => sproject.views - project.views)
+        .slice(0, 15)
+        .map(proj => ProjectList.sanitizeProjectObject(proj));
+    returnedData.tagged = allProjects
+        .filter(project => {
+            const projectName = Cast.toString(project.name).toLowerCase().trim();
+            const projectDescription = (Cast.toString(project.instructions)
+                + ` ${Cast.toString(project.notes)}`).toLowerCase().trim();
+            return projectDescription.includes(`#${randomTag}`) || projectName.includes(`#${randomTag}`);
+        })
+        .slice(0, 15)
+        .map(proj => ProjectList.sanitizeProjectObject(proj));
+    returnedData.latest = allProjects
+        .slice(0, 15)
+        .map(proj => ProjectList.sanitizeProjectObject(proj));
+
+    res.header("Content-Type", 'application/json');
+    res.status(200);
+    res.json(returnedData);
 });
 
 app.listen(port, () => console.log('Started server on port ' + port));

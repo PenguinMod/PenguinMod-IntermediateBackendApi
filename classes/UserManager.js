@@ -1,4 +1,4 @@
-const Database = require("easy-json-database");
+const Database = require("../easy-json-database");
 
 const { encrypt, decrypt } = require("../utilities/encrypt.js");
 const { ParseJSON } = require("../utilities/safejsonparse.js");
@@ -76,12 +76,11 @@ class UserManager {
         delete UserManager._states[username];
         UserManager.serialize();
     }
-    static verifyCode(privateCode) {
-        return new Promise((resolve, reject) => {
-            fetch(ScratchAuthURLs.verifyToken + privateCode).then(res => {
-                res.json().then(resolve).catch(reject);
-            }).catch(reject);
-        });
+    static async verifyCode(privateCode) {
+        const url = ScratchAuthURLs.verifyToken + privateCode;
+        const res = await fetch(url);
+        const json = await res.json();
+        return json;
     }
 
     static getMessages(username) {
@@ -136,7 +135,7 @@ class UserManager {
             }, false); // dont check "Projects API" if they have too many reports given
         }
     }
-    static addMessage(username, message) {
+    static addMessage(username, message, local) {
         const db = new Database(`./usermessages.json`);
         const messages = db.get(username);
         const newmessage = {
@@ -150,7 +149,15 @@ class UserManager {
             return;
         }
         messages.unshift(newmessage);
-        db.set(username, messages);
+        if (local) {
+            db.setLocal(username, messages);
+        } else {
+            db.set(username, messages);
+        }
+    }
+    static applyMessages() {
+        const db = new Database(`./usermessages.json`);
+        db.saveDataToFile();
     }
     static addModeratorMessage(username, message) {
         return UserManager.addMessage(username, {
@@ -278,10 +285,12 @@ class UserManager {
         UserManager.setFollowers(username, followers);
     }
     static notifyFollowers(username, feedMessage) {
+        const db = new Database(`./userfeed.json`);
         const followers = UserManager.getFollowers(username);
         for (const follower of followers) {
-            UserManager.addToUserFeed(follower, feedMessage);
+            UserManager.addToUserFeed(follower, feedMessage, true);
         }
+        db.saveDataToFile();
     }
 
     static getUserFeed(username) {
@@ -292,22 +301,23 @@ class UserManager {
         }
         return userfeed;
     }
-    static setUserFeed(username, data) {
+    static setUserFeed(username, data, local) {
         const db = new Database(`./userfeed.json`);
         if (!Array.isArray(data)) {
             console.error("Cannot set", username, "feed to non-array");
             return;
         }
+        if (local) {
+            db.setLocal(username, data);
+            return;
+        }
         db.set(username, data);
     }
-    static addToUserFeed(username, message) {
+    static addToUserFeed(username, message, local) {
         const feed = UserManager.getUserFeed(username);
         feed.unshift(message);
         // feed is not meant to be an infinite log
-        if (feed.length > 50) {
-            feed.splice(49, feed.length - 50);
-        }
-        UserManager.setUserFeed(username, feed);
+        UserManager.setUserFeed(username, feed.slice(0, 25), local);
     }
 }
 

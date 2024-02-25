@@ -1,8 +1,9 @@
 # PenguinMod-IntermediateBackendApi
-Do not use PenguinMod-LegacyBackendApi anymore once this is completed. This version uses less resources & avoids Data URLs.
+This is a very large clean-up of PenguinMod-LegacyBackendApi, and should be used instead of it. This version uses less resources & avoids Data URLs.
+A lot of extra features are also added that are not in the old API.
 
 ## Code
-Yes code is really messy, a newer API is still in development that should have each endpoint in it's own small file instead of one large file.
+Yes code is really messy, a newer API is still in development that should have each endpoint in it's own grouped file instead of one large file.
 
 ## Contributing
 uhh...
