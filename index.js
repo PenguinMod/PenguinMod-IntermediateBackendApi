@@ -916,6 +916,49 @@ app.get('/api/users/isApprover', async function (req, res) { // check if user is
             || AdminAccountUsernames.get(Cast.toString(req.query.username))
     });
 });
+app.get('/api/users/getDocumentUpdates', async function (req, res) { // check for TOS, privacy policy, uploading guidelines updates
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({
+        "tos": GlobalRuntimeConfig.get("last_tos_update"),
+        "privacy": GlobalRuntimeConfig.get("last_privacy_update"),
+        "uploading": GlobalRuntimeConfig.get("last_uploading_update"),
+    });
+});
+app.post('/api/users/setDocumentUpdates', async function (req, res) { // set update dates for TOS, privacy policy, uploading guidelines
+    if (!UserManager.isCorrectCode(req.body.username, req.body.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (!AdminAccountUsernames.get(Cast.toString(req.body.username))) {
+        res.status(403);
+        res.header("Content-Type", "application/json");
+        res.json({ error: "FeatureDisabledForThisAccount" });
+        return;
+    }
+    const updateTypes = req.body.update;
+    if (!Array.isArray(updateTypes)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "UpdatePropertyIsNotArray" });
+        return;
+    }
+    if (updateTypes.includes('tos')) {
+        GlobalRuntimeConfig.set('last_tos_update', Date.now());
+    }
+    if (updateTypes.includes('privacy')) {
+        GlobalRuntimeConfig.set('last_privacy_update', Date.now());
+    }
+    if (updateTypes.includes('uploading')) {
+        GlobalRuntimeConfig.set('last_uploading_update', Date.now());
+    }
+
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "success": true });
+});
 app.get('/api/users/getMyProjects', async function (req, res) { // get projects of a user (need username and private code)
     if (!UserManager.isCorrectCode(req.query.user, req.query.code)) {
         res.status(400);
@@ -978,6 +1021,7 @@ app.get('/api/users/getMessages', async function (req, res) { // get a users mes
     res.header("Content-Type", 'application/json');
     res.json(returning);
 });
+// SHOULD BE DEPRECATED: too unstable
 // nvm, endpoint reused for "guidelines" messages
 app.post('/api/users/addMessage', async function (req, res) { // add a message to a user (by username and private code)
     const packet = req.body;
@@ -1019,21 +1063,22 @@ app.post('/api/users/addMessage', async function (req, res) { // add a message t
                 text: unsafeMessage.text
             });
             break;
+        // DEPRECATED: too unstable
         case 'guidelines':
             if (!AdminAccountUsernames.get(username)) return notallowed();
             if (typeof unsafeMessage.section !== "string") return invalidate();
-            const db = new Database(`./userdata.json`);
-            const usernames = db.all().map(item => item.key);
-            // use addMessage locally (see the last arg being true)
-            for (const username of usernames) {
-                UserManager.addMessage(username, {
-                    type: unsafeMessage.type,
-                    section: unsafeMessage.section
-                }, true);
-            }
-            // save local changes to the file
-            UserManager.applyMessages();
-            break;
+            // const db = new Database(`./userdata.json`);
+            // const usernames = db.all().map(item => item.key);
+            // // use addMessage locally (see the last arg being true)
+            // for (const username of usernames) {
+            //     UserManager.addMessage(username, {
+            //         type: unsafeMessage.type,
+            //         section: unsafeMessage.section
+            //     }, true);
+            // }
+            // // save local changes to the file
+            // UserManager.applyMessages();
+            return invalidate();
         default:
             return invalidate();
     }
@@ -1654,6 +1699,12 @@ app.get('/api/users/report', async function (req, res) {
         res.json({ error: "Reauthenticate" });
         return;
     }
+    if (UserManager.isBanned(packet.username)) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
 
     const reportedUser = Cast.toString(packet.target);
     const reportedReason = Cast.toString(packet.reason).substring(0, 2048);
@@ -1804,6 +1855,12 @@ app.get('/api/projects/report', async function (req, res) {
         res.status(400);
         res.header("Content-Type", "application/json");
         res.json({ error: "Reauthenticate" });
+        return;
+    }
+    if (UserManager.isBanned(packet.username)) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
         return;
     }
 
@@ -2624,6 +2681,13 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
         res.json({ "error": "Reauthenticate" });
         return;
     }
+    if (UserManager.isBanned(username)) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
     const idToSetTo = String(packet.id);
     const db = new Database(`${__dirname}/projects/published.json`);
     if (!db.has(idToSetTo)) {
@@ -2640,6 +2704,13 @@ app.post('/api/projects/toggleProjectVote', async function (req, res) {
         res.json({ "error": "CantVoteUnapprovedProject" });
         return;
     }
+    if (UserManager.isBanned(project.owner)) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "ProjectIsOwnedByBannedUser" });
+        return;
+    }
+
     let targetType = 'loves';
     if (packet.type === 'votes') {
         targetType = 'votes';
@@ -2758,6 +2829,47 @@ app.get('/api/projects/getProjectVote', async function (req, res) {
     // const userValue = encrypt(username);
     const loved = DecryptArray(project.loves).includes(username);
     const voted = DecryptArray(project.votes).includes(username);
+    res.status(200);
+    res.header("Content-Type", 'application/json');
+    res.json({ "loved": loved, "voted": voted });
+});
+app.get('/api/projects/getProjectVoteUsers', async function (req, res) {
+    const packet = req.query;
+    const username = String(packet.user);
+    if (!UserManager.isCorrectCode(username, packet.passcode)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "Reauthenticate" });
+        return;
+    }
+    if (
+        !AdminAccountUsernames.get(Cast.toString(username))
+        && !ApproverUsernames.get(Cast.toString(username))
+    ) {
+        res.status(403);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "FeatureDisabledForThisAccount" });
+        return;
+    }
+
+    const idToSetTo = String(packet.id);
+    const db = new Database(`${__dirname}/projects/published.json`);
+    if (!db.has(idToSetTo)) {
+        res.status(400);
+        res.header("Content-Type", 'application/json');
+        res.json({ "error": "NotFound" });
+        return;
+    }
+    // idk if db uses a reference to the object or not
+    const project = structuredClone(db.get(idToSetTo));
+    if (!Array.isArray(project.loves)) {
+        project.loves = [];
+    }
+    if (!Array.isArray(project.votes)) {
+        project.votes = [];
+    }
+    const loved = DecryptArray(project.loves);
+    const voted = DecryptArray(project.votes);
     res.status(200);
     res.header("Content-Type", 'application/json');
     res.json({ "loved": loved, "voted": voted });
@@ -3448,6 +3560,7 @@ app.get('/api/projects/search', async function (req, res) {
     const projectSearchingName = req.query.includes;
     const mustBeFeatured = req.query.featured;
     const shouldReturnRandomProject = Cast.toBoolean(req.query.random);
+    const searchInDescription = Cast.toBoolean(req.query.usedesc);
     const sortingBy = Cast.toString(req.query.sortby);
 
     // add featured projects first but also sort them by date
@@ -3467,16 +3580,24 @@ app.get('/api/projects/search', async function (req, res) {
         return latestValue;
     }).filter(proj => (proj.accepted && !proj.hidden && !proj.removedsoft) === true).filter(project => {
         if (projectSearchingName) {
-            const projectName = Cast.toString(project.name).toLowerCase().trim();
             const searchQueryName = Cast.toString(projectSearchingName).toLowerCase().trim();
+
+            const projectName = Cast.toString(project.name).toLowerCase().trim();
+            const projectDescription = Cast.toString(project.instructions).toLowerCase().trim()
+                + ` ${Cast.toString(project.notes).toLowerCase().trim()}`;
+            let descriptionContainsSearch = false;
+            if (searchInDescription) {
+                descriptionContainsSearch = projectDescription.includes(searchQueryName);
+            }
+
+            // if we find tags in the search query, check to see if the project description has them
+            // no need to check for project name to have them since we do that below anyway
             const tagMatches = searchQueryName.match(/#[^\s]+/gmi);
             let tagsFound = false;
             if (tagMatches) {
-                const projectDescription = Cast.toString(project.instructions).toLowerCase().trim()
-                    + ` ${Cast.toString(project.notes).toLowerCase().trim()}`;
                 tagsFound = tagMatches.some(tag => projectDescription.includes(tag));
             }
-            return tagsFound || projectName.includes(searchQueryName);
+            return tagsFound || descriptionContainsSearch || projectName.includes(searchQueryName);
         }
         if (typeof projectOwnerRequired !== "string") {
             return true;
