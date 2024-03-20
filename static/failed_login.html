@@ -54,15 +54,12 @@
         <div class="full">
             <div class="main">
                 <h1>Oops!</h1>
-                <p>An error occurred. Something might have gone wrong with Scratch Auth.</p>
+                <p>An error occurred. Something might have gone wrong with Scratch OAuth2.</p>
                 <img src="https://penguinmod.com/penguins/server.svg" style="height: 7rem;">
                 <p>Please copy and report this error <a href="https://discord.gg/NZ9MBMYTZh">to our Discord server</a>.</p>
                 <div>
                     <button id="copy">
                         Copy
-                    </button>
-                    <button id="retry">
-                        Retry Login
                     </button>
                 </div>
                 <p>Error:</p>
@@ -70,18 +67,12 @@
             </div>
         </div>
         <script>
-            const copyCode = `{{ERROR_CODE}}`;
+            const copyCode = `{{ERROR_DETAIL}}`;
             const copyButton = document.getElementById('copy');
-            const retryButton = document.getElementById('retry');
             const codeArea = document.getElementById('code');
             codeArea.innerHTML = copyCode;
             copyButton.onclick = () => {
                 navigator.clipboard.writeText(codeArea.innerText);
-            };
-            retryButton.onclick = () => {
-                const retryPath = location.origin + location.pathname;
-                const base64 = btoa(retryPath);
-                location.href = `https://auth.itinerary.eu.org/auth/?redirect=${base64}&name=PenguinMod`;
             };
         </script>
     </body>

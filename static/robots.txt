@@ -1,914 +1,1218 @@
 User-agent: ABCdatos BotLink
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Acme.Spider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Ahoy! The Homepage Finder
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Alkaline
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Anthill
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Walhello appie
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Arachnophilia
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Arale
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Araneo
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: AraybOt
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: ArchitextSpider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Aretha
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: ARIADNE
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: arks
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: AskJeeves
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: ASpider (Associative Spider)
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: ATN Worldwide
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Atomz.com Search Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: AURESYS
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: BackRub
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Bay Spider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Big Brother
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Bjaaland
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: BlackWidow
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Die Blinde Kuh
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Bloodhound
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Borg-Bot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: BoxSeaBot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: bright.net caching robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: BSpider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: ByteSpider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Bytespider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: CACTVS Chemistry Spider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Calif
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Cassandra
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Digimarc Marcspider/CGI
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Checkbot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: ChristCrawler.com
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: churl
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: cIeNcIaFiCcIoN.nEt
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: CMC/0.01
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Collective
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Combine System
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Conceptbot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: ConfuzzledBot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: CoolBot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Web Core / Roots
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: XYLEME Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Internet Cruiser Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Cusco
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: CyberSpyder Link Test
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: CydralSpider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Desert Realm Spider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: DeWeb(c) Katalog/Index
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: DienstSpider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Digger
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Digital Integrity Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Direct Hit Grabber
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: DNAbot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: DownLoad Express
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: DragonBot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: DWCP (Dridus' Web Cataloging Project)
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: e-collector
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: EbiNess
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: EIT Link Verifier Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: ELFINBOT
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Emacs-w3 Search Engine
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: ananzi
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: esculapio
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Esther
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Evliya Celebi
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: FastCrawler
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Fluid Dynamics Search Engine robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Felix IDE
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Wild Ferret Web Hopper #1, #2, #3
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: FetchRover
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: fido
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: HÃ¤mÃ¤hÃ¤kki
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: KIT-Fireball
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Fish search
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Fouineur
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Robot Francoroute
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Freecrawl
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: FunnelWeb
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: gammaSpider, FocusedCrawler
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: gazz
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: GCreep
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: GetBot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: GetURL
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Golem
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Googlebot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Grapnel/0.01 Experiment
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Griffon
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Gromit
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Northern Light Gulliver
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Gulper Bot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: HamBot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Harvest
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: havIndex
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: HI (HTML Index) Search
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Hometown Spider Pro
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: ht://Dig
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: HTMLgobble
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Hyper-Decontextualizer
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: iajaBot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: IBM_Planetwide
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Popular Iconoclast
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Ingrid
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Imagelock
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: IncyWincy
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Informant
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: InfoSeek Robot 1.0
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Infoseek Sidewinder
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: InfoSpiders
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Inspector Web
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: IntelliAgent
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: I, Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Iron33
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Israeli-search
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: JavaBee
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: JBot Java Web Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: JCrawler
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Jeeves
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: JoBo Java Web Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Jobot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: JoeBot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: The Jubii Indexing Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: JumpStation
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: image.kapsi.net
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Katipo
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: KDD-Explorer
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Kilroy
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: KO_Yappo_Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: LabelGrabber
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: larbin
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: legs
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Link Validator
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: LinkScan
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: LinkWalker
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Lockon
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: logo.gif Crawler
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Lycos
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Mac WWWWorm
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Magpie
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: marvin/infoseek
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Mattie
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: MediaFox
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: MerzScope
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: NEC-MeshExplorer
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: MindCrawler
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: mnoGoSearch search engine software
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: moget
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: MOMspider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Monster
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Motor
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: MSNBot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Muncher
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Muninn
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Muscat Ferret
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Mwd.Search
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Internet Shinchakubin
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: NDSpider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Nederland.zoek
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: NetCarta WebMap Engine
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: NetMechanic
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: NetScoop
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: newscan-online
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: NHSE Web Forager
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Nomad
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: The NorthStar Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: nzexplorer
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: ObjectsSearch
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Occam
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: HKU WWW Octopus
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: OntoSpider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Openfind data gatherer
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Orb Search
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Pack Rat
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: PageBoy
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: ParaSite
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Patric
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: pegasus
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: The Peregrinator
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: PerlCrawler 1.0
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Phantom
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: PhpDig
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: PiltdownMan
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Pimptrain.com's robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Pioneer
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: html_analyzer
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Portal Juice Spider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: PGP Key Agent
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: PlumtreeWebAccessor
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Poppi
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: PortalB Spider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: psbot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: GetterroboPlus Puu
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: The Python Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Raven Search
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: RBSE Spider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Resume Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: RoadHouse Crawling System
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: RixBot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Road Runner: The ImageScape Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Robbie the Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: ComputingSite Robi/1.0
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: RoboCrawl Spider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: RoboFox
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Robozilla
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Roverbot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: RuLeS
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: SafetyNet Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Scooter
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Sleek
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Search.Aus-AU.COM
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: SearchProcess
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Senrigan
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: SG-Scout
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: ShagSeeker
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Shai'Hulud
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Sift
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Simmany Robot Ver1.0
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Site Valet
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Open Text Index Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: SiteTech-Rover
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Skymob.com
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: SLCrawler
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Inktomi Slurp
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Smart Spider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Snooper
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Solbot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Spanner
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Speedy Spider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: spider_monkey
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: SpiderBot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Spiderline Crawler
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: SpiderMan
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: SpiderView(tm)
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Spry Wizard Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Site Searcher
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Suke
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: suntek search engine
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Sven
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Sygol
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: TACH Black Widow
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Tarantula
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: tarspider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Tcl W3 Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: TechBOT
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Templeton
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: TeomaTechnologies
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: TITAN
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: TitIn
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: The TkWWW Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: TLSpider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: UCSD Crawl
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: UdmSearch
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: UptimeBot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: URL Check
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: URL Spider Pro
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Valkyrie
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Verticrawl
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Victoria
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: vision-search
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: void-bot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Voyager
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: VWbot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: The NWI Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: W3M2
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WallPaper (alias crawlpaper)
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: the World Wide Web Wanderer
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: w@pSpider by wap4.com
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WebBandit Web Spider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WebCatcher
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WebCopy
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: webfetcher
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: The Webfoot Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Webinator
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: weblayers
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WebLinker
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WebMirror
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: The Web Moose
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WebQuest
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Digimarc MarcSpider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WebReaper
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: webs
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Websnarf
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WebSpider
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WebVac
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: webwalk
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WebWalker
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WebWatch
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Wget
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: whatUseek Winona
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WhoWhere Robot
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Wired Digital
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: Weblog Monitor
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: w3mir
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WebStolperer
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: The Web Wombat
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: The World Wide Web Worm
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WWWC Ver 0.2.5
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: WebZinger
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: XGET
 Disallow: /
+Allow: /[0-9]+$
 
 User-agent: *
 Allow: /

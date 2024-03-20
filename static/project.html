@@ -7,7 +7,7 @@
 
         <meta property="og:title" content="{project.name}">
         <meta name="twitter:title" content="{project.name}">
-        <title>PenguinMod - {project.name}</title>
+        <title>{project.name} on PenguinMod</title>
         
         <meta property="og:image" content="https://projects.penguinmod.com/api/pmWrapper/iconUrl?id={project.id}">
 
@@ -18,9 +18,15 @@
         <meta property="twitter:description" content="{project.instructions}&#10;&#10;{project.notes}">
     </head>
     <body>
-        <p>Please wait...</p>
         <script>
             location.href = 'https://studio.penguinmod.com/#{project.id}';
         </script>
+
+        <h1>{project.name}</h1>
+        <p>{project.instructions}</p>
+        <p>{project.notes}</p>
+
+        <br>
+        <p>You are being redirected to this project. Please wait...</p>
     </body>
 </html>

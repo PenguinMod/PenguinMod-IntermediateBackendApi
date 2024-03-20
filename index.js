@@ -24,9 +24,7 @@ let globalOperationCounter = 0;
 const { encrypt, decrypt } = require("./utilities/encrypt.js");
 
 const UserManager = require("./classes/UserManager.js");
-// const UserStorage = require("./classes/UserStorage.js");
-// const StorageSpace = new UserStorage(32000000, 3); // 32 mb per data piece, 3 keys per container
-UserManager.load(); // should prevent logouts
+UserManager.createBaseIfNotPresent();
 
 const ProjectList = require("./classes/ProjectList.js");
 const GenericList = require("./classes/GenericList.js");
@@ -165,7 +163,13 @@ app.get('/', async function (_, res) { // just basic stuff. returns the home pag
     res.redirect('https://penguinmod.com');
 });
 app.get('/robots.txt', async function (_, res) { // more basic stuff!!!!! returns robots.txt
-    res.sendFile(path.join(__dirname, './robots.txt'));
+    res.sendFile(path.join(__dirname, './static/robots.txt'));
+});
+app.get('/favicon.png', async function (_, res) {
+    res.sendFile(path.join(__dirname, './static/favicon.png'));
+});
+app.get('/icon.png', async function (_, res) {
+    res.sendFile(path.join(__dirname, './static/icon.png'));
 });
 
 // get API metadata
@@ -179,11 +183,11 @@ app.get('/api/ping', async function (_, res) {
     res.send("Pong!");
 });
 const projectsDatabase = new Database(`${__dirname}/projects/published.json`);
-const projectTemplate = fs.readFileSync('./project.html').toString();
+const projectTemplate = fs.readFileSync('./static/project.html').toString();
 app.get('/:id', async function (req, res) {
     const json = projectsDatabase.get(String(req.params.id));
     if (!json) {
-        res.sendFile(path.join(__dirname, './404-noproject.html'));
+        res.sendFile(path.join(__dirname, './static/404-noproject.html'));
         return;
     }
     let html = projectTemplate;
@@ -782,99 +786,68 @@ app.get('/api/pmWrapper/getProject', async function (req, res) { // get data of 
     res.status(200);
     res.json({ id: json.id, name: json.name, author: { id: -1, username: json.owner, } });
 });
-// scratch auth implementation
-const generateErrorCode = (worked, verifyErr, valid, validRedir, redirect, local) => {
-    if (typeof verifyErr === 'object') {
-        try {
-            verifyErr = JSON.stringify(verifyErr);
-        } catch { // happens if we get recursion
-            verifyErr = '{}';
-        }
-    }
-    
-    const text = [];
-    text.push(worked ? 'CanVerify: true' : 'CanVerify: false');
-    text.push(valid ? 'ValidCode: true' : 'ValidCode: false');
-    text.push(validRedir ? 'ValidRedirect: true' : 'ValidRedirect: false');
-    text.push(local ? 'Local: true' : 'Local: false');
-    text.push('Redirect: ' + (redirect ? redirect : 'NO_REDIRECT'));
-    text.push('VerifyError: ' + (verifyErr ? verifyErr : 'NO_VERIFY_ERR'));
-    return text
-        .map(escapeXML) // sanitize for HTML
-        .map(text => text // sanitize for JS
-            .replaceAll('\\', '\\\\')
-            .replaceAll('`', '\\`')
-            .replaceAll('${', '$\\{')
-            .replaceAll('@', ' @ ') // remember, they'll be sending these in discord!
-        )
-        .join('<br>');
-};
-const failedLoginHTML = fs.readFileSync("./failed_login.html", "utf8");
-const handleLogin = (req, res, local) => {
-    const privateCode = Cast.toString(req.query.privateCode);
-    const expectingJSON = Cast.toString(req.header("Content-Type")).endsWith('json');
-    UserManager.verifyCode(privateCode).then(response => {
-        // check if it is a malicious site
-        // note: malicious sites cannot read the private code in the URL if it is the right redirect
-        //       thank you cors, you finally did something useful
 
-        // malicious APPS could, but at that point your just :trollface:d so :idk_man:
-        const invalidRedirect = local ? (
-            response.redirect !== 'https://projects.penguinmod.com/api/users/loginLocal'
-            && response.redirect !== 'http://localhost:8080/api/users/loginLocal'
-        ) : (
-            response.redirect !== 'https://projects.penguinmod.com/api/users/login'
-        );
-        if ((!response.valid) || (invalidRedirect)) {
-            const errorCode = generateErrorCode(true, null, response.valid, !invalidRedirect, response.redirect, local);
-            res.status(400);
-            if (expectingJSON) {
-                res.header("Content-Type", 'application/json');
-                res.json({ "error": "InvalidLogin", "code": errorCode });
-            } else {
-                res.header("Content-Type", 'text/html');
-                res.send(failedLoginHTML.replace('{{ERROR_CODE}}', errorCode));
-            }
-            if (invalidRedirect) {
-                console.log(response.redirect, "tried to falsely authenticate", response.username);
-            }
-            return;
-        }
-        // todo: maybe we should clear the login after a couple days or so?
+// scratch oauth2 implementation
+const failedLoginHTML = fs.readFileSync("./static/failed_login.html", "utf8");
+const handleLogin = (req, res, local) => {
+    const privateCode = Cast.toString(req.query.code);
+    const oauthState = Cast.toString(req.query.state);
+    const ipAddress = Cast.toString(req.ip);
+
+    const expectingJSON = Cast.toString(req.header("Content-Type")).endsWith('json');
+    UserManager.verifyCode(privateCode, oauthState, ipAddress).then(response => {
         const username = response.username;
-        UserManager.setCode(username, privateCode);
+        UserManager.setCode(username, privateCode, false);
         if (!UserManager.getProperty(username, "firstLogin")) {
             UserManager.setProperty(username, "firstLogin", Date.now());
         }
         UserManager.setProperty(username, "latestLogin", Date.now());
-        const userIP = req.ip;
-        if (userIP) {
-            // easier if the IP is the key
-            UsernameIP.set(Buffer.from(Cast.toString(userIP), 'utf8').toString('hex'), username);
-        }
+        const encodedForSomeReason = Buffer.from(ipAddress, 'utf8').toString('hex');
+        UsernameIP.set(encodedForSomeReason, username);
         // close window by opening success.html
+        const targetHTML = local ? "./static/success_local.html" : "./static/success.html";
         res.header("Content-Type", 'text/html');
         res.status(200);
-        res.sendFile(path.join(__dirname, 
-            local ? "./success_local.html" : "./success.html"
-        ));
+        res.sendFile(path.join(__dirname, targetHTML));
     }).catch((err) => {
-        const errorCode = generateErrorCode(false, err, false, false, null, local);
+        if (DEBUG_logAllFailedData) {
+            console.error(err.response.data);
+        }
+
         res.status(400);
         if (expectingJSON) {
             res.header("Content-Type", 'application/json');
-            res.json({ "error": "InvalidLogin", "code": errorCode });
-        } else {
-            res.header("Content-Type", 'text/html');
-            res.send(failedLoginHTML.replace('{{ERROR_CODE}}', errorCode));
+            res.json({ "error": "InvalidLogin", "detail": err });
+            return;
         }
+        const html = failedLoginHTML.replace('{{ERROR_DETAIL}}', escapeXML(err));
+        res.header("Content-Type", 'text/html');
+        res.send(html);
     });
 };
+// all get reqs because they are redirected to them in the browser
 app.get('/api/users/login', async function (req, res) { // login with scratch
     handleLogin(req, res, false);
 });
 app.get('/api/users/loginLocal', async function (req, res) { // login with local account (like localhost)
     handleLogin(req, res, true);
+});
+// request login session
+app.post('/api/users/requestLoginSession', (req, res) => {
+    res.header("Content-Type", 'application/json');
+
+    let returnValue = null;
+    try {
+        returnValue = UserManager.requestOAuth2State(req.ip);
+    } catch (error) {
+        res.status(403);
+        res.json({ "error": error });
+        return;
+    }
+    
+    const loginState = returnValue;
+    res.status(200);
+    res.json({ "session": loginState });
 });
 // logout
 app.get('/api/users/logout', (req, res) => { // logout
@@ -892,16 +865,21 @@ app.get('/api/users/logout', (req, res) => { // logout
 app.get('/api/users/usernameFromCode', async function (req, res) { // get username from private code
     const privateCode = Cast.toString(req.query.privateCode);
     const username = UserManager.usernameFromCode(privateCode);
-    if (username == null) {
+    if (!username) {
         res.status(404);
         res.header("Content-Type", 'application/json');
         res.json({ "error": "CodeNotFound" });
         return;
     }
+
+    const actualUsername = Cast.toString(username);
+    const profile = GenerateProfileJSON(actualUsername);
+
     res.status(200);
     res.header("Content-Type", 'application/json');
-    res.json(GenerateProfileJSON(Cast.toString(username)));
+    res.json(profile);
 });
+
 // extra stuff
 app.get('/api/users/isAdmin', async function (req, res) { // check if user is admin (by username)
     res.status(200);

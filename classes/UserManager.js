@@ -1,10 +1,15 @@
 const Database = require("../easy-json-database");
+const { default: axios } = require("axios");
 
+const { randomUUID } = require("crypto");
 const { encrypt, decrypt } = require("../utilities/encrypt.js");
 const { ParseJSON } = require("../utilities/safejsonparse.js");
+const Cast = require("./Cast.js");
 
 const ScratchAuthURLs = {
     verifyToken: `https://auth-api.itinerary.eu.org/auth/verifyToken/`,
+    verifyOAuth2: `https://oauth2.scratch-wiki.info/w/rest.php/soa2/v0/tokens`,
+    getOAuth2Name: `https://oauth2.scratch-wiki.info/w/rest.php/soa2/v0/user`,
 };
 
 const generateId = () => {
@@ -17,26 +22,180 @@ const generateId = () => {
     const raw = rn.join('.');
     return Buffer.from(raw).toString("base64");
 };
+const generateOAuth2State = () => {
+    const uuid = randomUUID();
+    const state = `pm-${uuid}`;
+    return state;
+};
 
+const userLoginDB = new Database(`./users.json`);
+const loginStates = {
+    ips: {}, // { '127.0.0.1': { valid: true, expire: Date.now() } }
+    states: {}
+};
 class UserManager {
-    static _states = {}
+    static createBaseIfNotPresent() {
+        const sessions = userLoginDB.get('sessions');
+        const manual = userLoginDB.get('manual');
 
-    static async serialize() {
-        const db = new Database(`./users.json`);
-        db.set("data", encrypt(JSON.stringify(UserManager._states)));
+        // logged in users
+        if (!sessions || typeof sessions !== 'object') {
+            userLoginDB.set('sessions', {});
+        }
+        // manually added users
+        if (!manual || typeof manual !== 'object') {
+            userLoginDB.set('manual', {});
+        }
     }
-    static deserialize() {
-        // todo: this data is not required for the api to run since clearing it just makes everyone have to log in again
-        // so we should handle errors and just reset the DB if it failed to deserialize
-        const db = new Database(`./users.json`);
-        if (!db.get("data")) return {};
-        return ParseJSON(decrypt(db.get("data")));
+    static stateDateExpired(date) {
+        const currentDate = Date.now();
+        const maxTime = 60 * 5 * 1000; // 5 minutes
+        return (currentDate - date) >= maxTime;
+    }
+    static invalidateOldIpStates() {
+        for (const ip in loginStates.ips) {
+            const ipState = loginStates.ips[ip];
+            if (!ipState.valid || UserManager.stateDateExpired(ipState.expire)) {
+                delete loginStates.ips[ip];
+            }
+        }
+    }
+    static requestOAuth2State(ip) {
+        UserManager.invalidateOldIpStates();
+        const ipState = loginStates.ips[ip];
+        if (ipState) {
+            delete loginStates.ips[ip];
+        }
+
+        const generatedState = generateOAuth2State();
+        const maxTime = 60 * 5 * 1000; // 5 minutes
+        loginStates.states[generatedState] = {
+            valid: true,
+            expire: Date.now() + maxTime,
+            ip
+        };
+        loginStates.ips[ip] = {
+            valid: true,
+            expire: Date.now() + maxTime
+        }
+
+        return generatedState;
+    }
+    static invalidateOAuth2State(state) {
+        const loginState = loginStates.states[state];
+        if (!loginState) return;
+
+        const ip = loginState.ip;
+        if (ip in loginStates.ips) {
+            delete loginStates.ips[ip];
+        }
+
+        delete loginStates.states[state];
     }
 
-    static load() {
-        UserManager._states = UserManager.deserialize();
+    static isCorrectCode(username, privateCode) {
+        const sessions = userLoginDB.get('sessions');
+        const manual = userLoginDB.get('manual');
+        
+        // check if our private code is in sessions or manual sessions
+        const instance = sessions[username] || manual[username];
+        if (!instance) return false;
+
+        // is the private code that we found correct?
+        return instance === privateCode;
+    }
+    static usernameFromCode(privateCode) {
+        const sessions = userLoginDB.get('sessions');
+        const manual = userLoginDB.get('manual');
+        const allLogins = {
+            ...sessions,
+            ...manual
+        };
+        
+        return Object.keys(allLogins)
+            .find(key => allLogins[key] === privateCode);
+    }
+    static async verifyCode(privateCode, state, ip) {
+        const loginState = loginStates.states[state] || {};
+        if (loginState.valid !== true) {
+            throw new Error('The login process has expired');
+        }
+        if (loginState.ip !== ip) {
+            throw new Error('Logins must start and end on the same IP address');
+        }
+        UserManager.invalidateOAuth2State(state);
+
+        const response = await axios({
+            url: ScratchAuthURLs.verifyOAuth2,
+            method: 'post',
+            data: {
+                client_id: Cast.toNumber(process.env.ScratchOAuth2ClientId),
+                client_secret: process.env.ScratchOAuth2ClientSecret,
+                code: privateCode,
+                scopes: ["identify"]
+            }
+        });
+        if (!response) {
+            throw new Error('No response object');
+        }
+        if (!response.data) {
+            throw new Error('No data attached with response');
+        }
+
+        const accessToken = response.data.access_token;
+        if (!accessToken) {
+            throw new Error('No access_token attached with response data');
+        }
+        if (typeof accessToken !== 'string') {
+            throw new Error('access_token is not string');
+        }
+
+        const base64 = Buffer.from(accessToken).toString('base64');
+        const responseUser = await axios.get(ScratchAuthURLs.getOAuth2Name, {
+            headers: { 'Authorization': `Bearer ${base64}` }
+        });
+        if (!responseUser) {
+            throw new Error('No response object from OAuth2 name request');
+        }
+        if (!responseUser.data) {
+            throw new Error('No data attached with OAuth2 name response');
+        }
+
+        const username = responseUser.data.user_name;
+        if (!username || typeof username !== 'string') {
+            throw new Error('No valid username attached with OAuth2 name response');
+        }
+        
+        return username;
     }
 
+    static setCode(username, privateCode, manual) {
+        const loginDB = manual ? 'manual' : 'sessions';
+        const sessions = userLoginDB.get(loginDB);
+
+        sessions[username] = privateCode;
+        userLoginDB.set(loginDB, sessions);
+    }
+    static logoutUser(username) {
+        const sessions = userLoginDB.get('sessions');
+        const manual = userLoginDB.get('manual');
+
+        let changedSessions = false;
+        let changedManual = false;
+        if (username in sessions) {
+            changedSessions = true;
+            delete sessions[username];
+        }
+        if (username in manual) {
+            changedManual = true;
+            delete manual[username];
+        }
+
+        if (changedSessions) userLoginDB.set('sessions', sessions);
+        if (changedManual) userLoginDB.set('manual', manual);
+    }
+
+    // banned users
     static isBanned(username) {
         const db = new Database(`./banned.json`);
         if (db.get(String(username))) return true;
@@ -51,38 +210,7 @@ class UserManager {
         db.delete(String(username));
     }
 
-    static isCorrectCode(username, privateCode) {
-        if (!privateCode) return false;
-        if (!UserManager._states[username]) return false;
-        if (typeof UserManager._states[username] !== 'string') return false;
-        return UserManager._states[username] == privateCode;
-    }
-    static usernameFromCode(privateCode) {
-        const codes = Object.getOwnPropertyNames(UserManager._states);
-        let returning = null;
-        for (let i = 0; i < codes.length; i++) {
-            if (UserManager._states[codes[i]] == privateCode) {
-                returning = codes[i];
-            }
-        }
-        return returning;
-    }
-    static setCode(username, privateCode) {
-        UserManager._states[username] = privateCode;
-        UserManager.serialize();
-    }
-    static logoutUser(username) {
-        if (UserManager._states[username] == null) return;
-        delete UserManager._states[username];
-        UserManager.serialize();
-    }
-    static async verifyCode(privateCode) {
-        const url = ScratchAuthURLs.verifyToken + privateCode;
-        const res = await fetch(url);
-        const json = await res.json();
-        return json;
-    }
-
+    // messages
     static getMessages(username) {
         const db = new Database(`./usermessages.json`);
         const messages = db.get(username);
