@@ -3263,7 +3263,11 @@ app.post('/api/projects/publish', async function (req, res) {
             for (let extension of projectCodeJSON.extensions) {
                 let isUrl = isUrlExtension(extension);
                 if (isUrl) {
-                    extension = projectCodeJSON.extensionURLs[extension];
+                    res.status(403);
+                    res.header("Content-Type", 'application/json');
+                    res.json({ error: "CannotUseThisExtensionForThisRank", isUrl, extension });
+                    if (DEBUG_logAllFailedData) console.log("CannotUseThisExtensionForThisRank", packet);
+                    return;
                 }
                 if (!checkExtensionIsAllowed(extension, isUrl)) {
                     res.status(403);
