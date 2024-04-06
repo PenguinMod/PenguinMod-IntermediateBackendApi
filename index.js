@@ -3374,7 +3374,11 @@ app.post('/api/projects/publish', async function (req, res) {
             };
             for (let extension of projectCodeJSON.extensions) {
                 let isUrl = isUrlExtension(extension);
-                if (isUrl) {
+                const trustedSources = [
+                    "https://extensions.penguinmod.com",
+                    "https://extensions.turbowarp.org/"
+                ]
+                if (isUrl && !trustedSources.includes(projectCodeJSON.extensionURLs[extension])) {
                     res.status(403);
                     res.header("Content-Type", 'application/json');
                     res.json({ error: "CannotUseThisExtensionForThisRank", isUrl, extension });
