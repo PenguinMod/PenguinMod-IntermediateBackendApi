@@ -3378,7 +3378,14 @@ app.post('/api/projects/publish', async function (req, res) {
                     "https://extensions.penguinmod.com",
                     "https://extensions.turbowarp.org/"
                 ]
-                if (isUrl && !trustedSources.includes(projectCodeJSON.extensionURLs[extension])) {
+                let isTrustedSource = false;
+                for (let source of trustedSources) {
+                    if (projectCodeJSON.extensionURLs[extension].startsWith(source)) {
+                        isTrustedSource = true;
+                        break;
+                    }
+                }
+                if (isUrl && !isTrustedSource) {
                     res.status(403);
                     res.header("Content-Type", 'application/json');
                     res.json({ error: "CannotUseThisExtensionForThisRank", isUrl, extension });
