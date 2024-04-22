@@ -105,7 +105,7 @@ class UserManager {
         if (!Array.isArray(reports)) {
             return [];
         }
-        return reports
+        return reports;
     }
     static getAllReports() {
         const db = new Database(`./userreports.json`);
